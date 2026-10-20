@@ -1,0 +1,32 @@
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+!**/env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+.local/
+
+# Dependencies and generated output
+node_modules/
+.pnpm-store/
+target/
+dist/
+coverage/
+playwright-report/
+test-results/
+*.log
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/
+*.iml
+*.swp
+
+# Local analysis
+work/
+__pycache__/
