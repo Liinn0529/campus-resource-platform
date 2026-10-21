@@ -1,0 +1,13 @@
+{
+  "name": "campus-resource-platform",
+  "private": true,
+  "packageManager": "pnpm@11.25.0",
+  "engines": { "node": ">=24.15.0 <25" },
+  "scripts": {
+    "dev": "pnpm --filter @campus/web dev",
+    "build": "pnpm --filter @campus/web build",
+    "lint": "pnpm --filter @campus/web lint",
+    "typecheck": "pnpm --filter @campus/web typecheck",
+    "test": "pnpm --filter @campus/web test"
+  }
+}
