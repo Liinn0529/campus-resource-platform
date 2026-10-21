@@ -1,6 +1,6 @@
 FROM node:24-alpine AS build
 WORKDIR /workspace
-RUN npm install --global pnpm@11.25.0
+RUN corepack enable && corepack install --global pnpm@11.25.0
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/web/package.json apps/web/package.json
 RUN pnpm install --frozen-lockfile
@@ -13,5 +13,5 @@ COPY --from=build /workspace/apps/web/dist /usr/share/nginx/html
 USER nginx
 EXPOSE 8080
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=6 \
-  CMD wget -q -O /dev/null http://127.0.0.1:8080/healthz || exit 1
+  CMD wget -Y off -q -O /dev/null http://127.0.0.1:8080/healthz || exit 1
 ENTRYPOINT ["nginx", "-g", "daemon off;"]
