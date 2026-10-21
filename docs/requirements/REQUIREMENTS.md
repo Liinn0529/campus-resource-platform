@@ -1,12 +1,12 @@
-# 需求基线（Phase 0）
+# 需求基线（当前 Phase 1）
 
 本项目为“校园资源服务平台”。本文件将源执行提示转换为稳定、可验收的需求，不代表功能已经实现。唯一业务来源为 [CODEX_EXECUTION_PROMPT.md](CODEX_EXECUTION_PROMPT.md)；来源栏的“§一…§四十一”对应原文中文章节，“§五.1”等对应章节内服务小节，“Phase N”对应原文阶段标题。原文没有明确的设计不得借本文件悄然补全，集中记录于未决问题。
 
-本次授权仅覆盖 Phase 0：治理、需求与架构文档。Phase 1–15、构建配置、数据库 migration、业务实现、自动化测试、CI/CD、真实部署均未开始。下表中的阶段是后续规划，不构成执行授权。Phase 0 八条文档项经整体检查后记 DONE（仅表示文档交付验收）；其他条目全部 TODO。治理约束虽适用于本次工作，其持续性验收也不因写入文档而自动 DONE。
+Phase 0 已交付，用户确认继续后授权 Phase 1 工程骨架；当前按分项验证并提交。Phase 2–15、数据库 migration、业务实现、CI/CD 和真实云部署尚未授权。下表阶段仍是规划，不构成提前执行授权。实现与验证状态以 [TRACEABILITY.md](TRACEABILITY.md) 的逐项证据为准。
 
 模块：D=platform-service（公共层），M1=reservation-service（自习座位与占用真值），M2=classroom-service（整教室审批），M3=maintenance-service（物业工单），Web=apps/web，Optional=最后可选自然语言 Agent。D 提供身份、权限、空间主数据、参数、签到码、通知和审计；M1/M2/M3 不得直接读 D 表。M2/M3 的房间占用及释放通过 M1 HTTP 契约执行。
 
-需求 ID 一经分配保持稳定：修改条目内容保留 ID；拆分时新增 ID 并记录关联，不重排现有编号。需求与 [TRACEABILITY.md](TRACEABILITY.md) 一对一；矩阵“Test”为计划验证方式，当前没有已实现或已执行的业务自动化测试；Phase 0 的实际文档检查见验证记录。来源中的示例字段、路径和枚举按附录保留；源示例测试名和 DONE 状态不作为项目现状。
+需求 ID 一经分配保持稳定：修改条目内容保留 ID；拆分时新增 ID 并记录关联，不重排现有编号。需求与 [TRACEABILITY.md](TRACEABILITY.md) 一对一；矩阵“Test”为计划验证方式，当前已有 Phase 1 运行端点与前端状态测试，尚无业务自动化测试；历史 Phase 0 文档检查见对应验证记录。来源中的示例字段、路径和枚举按附录保留；源示例测试名和 DONE 状态不作为项目现状。
 
 共 **186 条需求**。各分类数量：REQ-P0: 8, REQ-GOV: 12, REQ-ARCH: 12, REQ-DATA: 12, REQ-D: 8, REQ-M1: 17, REQ-M2: 10, REQ-M3: 12, REQ-API: 8, REQ-SEC: 12, REQ-ENG: 9, REQ-UI: 9, REQ-TEST: 12, REQ-OPS: 16, REQ-AGENT: 7, REQ-ETH: 7, REQ-PH: 15。
 
