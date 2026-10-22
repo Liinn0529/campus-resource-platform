@@ -2,24 +2,24 @@
 
 - 状态：**Proposed / 待人工 Review**
 - 日期：2026-10-20
-- 阶段：Phase 0
+- 阶段：Phase 0 起草；Phase 2 补充实施范围
 - 决策来源：[CODEX_EXECUTION_PROMPT.md](../requirements/CODEX_EXECUTION_PROMPT.md)第 4–10、16–18、24、29–37 节
 - 关联：[ARCHITECTURE.md](../architecture/ARCHITECTURE.md)、[DATA_OWNERSHIP.md](../architecture/DATA_OWNERSHIP.md)、[REQUIREMENTS.md](../requirements/REQUIREMENTS.md)、[TRACEABILITY.md](../requirements/TRACEABILITY.md)
 
-本 ADR 记录用户源文件已指定的架构约束及其影响。Proposed 表示本次整理尚待人工 Review，不表示可以自由替换源要求，也不表示人类已批准该文档或任何数据库/公共契约变更。此阶段未实现服务或数据库。
+本 ADR 记录用户源文件已指定的架构约束及其影响。Proposed 表示尚待人工 Review，不表示可以自由替换源要求，也不表示人类已批准该文档或任何数据库/公共契约变更。Phase 0 起草时尚无服务或数据库；Phase 1 已交付工程骨架，当前 Phase 2 已实现四 schema、八个独立应用/迁移账号、四服务 Flyway V1、D 的八张基础表及 local-only 最小 seed。具体范围见 [DATA_OWNERSHIP.md](../architecture/DATA_OWNERSHIP.md)，其余业务模型仍按后续阶段实施；本阶段 Compose 验收另见 [Phase 2 记录](../plans/phase-2.md)。
 
 ## 背景
 
 平台包含公共层 D、自习座位预约 M1、整教室预约审批 M2 和物业工单 M3。M2 的整房间批准与 M3 的维修会同时影响 M1 座位可用性。如果各模块直接写共享座位状态，来源、并发与失败恢复无法清晰归属。
 
-源要求采用 Monorepo、前后端分离、4 个后端服务、REST API、单 PostgreSQL 实例及独立 schema；禁止直接访问其他模块数据库、分布式事务、Redis 锁与非必要基础设施。此 ADR 在这些既定要求内固定责任边界，不开展超出 Phase 0 的架构重选或业务实现。
+源要求采用 Monorepo、前后端分离、4 个后端服务、REST API、单 PostgreSQL 实例及独立 schema；禁止直接访问其他模块数据库、分布式事务、Redis 锁与非必要基础设施。此 ADR 在这些既定要求内固定责任边界，保留完整目标架构；实施范围由各阶段授权与验收记录约束。
 
 ## 决策
 
 1. **D 拥有身份与主数据。** `platform-service` 管理用户、登录、RBAC、角色权限、楼宇/房间/座位、参数、签到码、通知接口和操作审计。D 不拥有预约占用账本。
 2. **M1 统一管理占用。** `reservation-service` 管理预约、签到结果、提醒、违约、历史及占用账本。`room_gate` 和 `seat_occupancy` 均归 M1；M2/M3 不得直接修改其表或 D 的座位状态来表达占用。
 3. **M2/M3 保持独立业务责任。** `classroom-service` 拥有申请审批和对应事件，`maintenance-service` 拥有工单维修验收和对应事件；它们通过 M1 内部 HTTP API 创建、释放房间占用。
-4. **单实例不等于共享访问。** 四服务分别使用 `platform`、`reservation`、`classroom`、`maintenance` schema 和独立账号，仅能访问本 schema。禁止跨 schema SQL、跨服务直接读写表和跨服务外键；跨服务实体仅以逻辑 ID 引用，通过 HTTP 校验和使用数据。
+4. **单实例不等于共享访问。** 四服务分别使用 `platform`、`reservation`、`classroom`、`maintenance` schema，各有独立 app 与 migrator 账号，仅能访问本 schema。迁移账号拥有本 schema，应用账号无 DDL 或 Flyway 历史表访问权限。禁止跨 schema SQL、跨服务直接读写表和跨服务外键；跨服务实体仅以逻辑 ID 引用，通过 HTTP 校验和使用数据。
 5. **M1 以房间为事务互斥单元。** 所有影响房间座位状态的操作，在 M1 本地事务中锁定 `room_gate` 对应行，再检查并改变占用。创建/取消座位预约、创建/释放教室占用、创建/释放维修占用都遵守同一规则，不引入 Redis 锁。
 6. **跨服务采用显式同步状态与有界重试。** M2 经 `APPROVED_PENDING_SYNC` 才到 `APPROVED`；M3 经 `BLOCKING_ROOM` 才到 `IN_PROGRESS`。仅网络错误和 5xx 可重试，4xx 不重试；次数上限遵守源要求“最多 3 次”，计数含义待确认，耗尽进入 `SYNC_FAILED`。不用分布式事务掩盖部分成功。
 7. **占用创建有幂等身份。** 唯一键为 `(source_module, source_ref_id, source_type)`，一致请求返回已有结果，冲突内容返回 409。源指定 DELETE 路径缺少 `sourceType`，须人工 Review 解决后才固化释放实现，不在本 ADR 暗自修改契约。
@@ -57,6 +57,6 @@
 | 时间与业务政策 | 时区、区间端点、签到/取消窗口、NO_SHOW 与取消的状态表达、审批/维修超时阈值 |
 | 安全和数据最小化 | 内部服务认证、JWT 签名校验、角色数据范围、通知/审计失败处理、保留和删除周期 |
 
-Phase 0 的验收为文档存在、需求可追踪、边界有文字说明、未提前实现业务。后续依次验证 schema 权限隔离、真实数据库锁与唯一约束、HTTP 幂等及错误分类、M2/M3 到 M1 的业务 E2E、部署与版本追踪。相关测试和运行结果尚不存在。
+Phase 0 的历史验收为文档存在、需求可追踪、边界有文字说明、未提前实现业务；Phase 1 已有运行端点和容器验收记录。Phase 2 使用真实 PostgreSQL/Testcontainers 验证迁移、schema 权限隔离、最小 seed 及幂等，结果单独记录。真实业务锁与唯一约束、HTTP 幂等及错误分类、M2/M3 到 M1 的业务 E2E 和生产部署仍须后续验证，不能从基础数据库测试推导业务完成。
 
-人工 Review 通过后方可记录 ADR 接受状态；完成 Phase 0 后仍须停止，等待用户明确确认再进入 Phase 1。文档的 Proposed 状态不能被 CI 通过、Git 提交或上传仓库自动替代。
+人工 Review 通过后方可记录 ADR 接受状态；当前 Phase 2 完成后须停止，等待用户明确确认再进入 Phase 3。文档的 Proposed 状态不能被阶段执行授权、测试通过、Git 提交或上传仓库自动替代。

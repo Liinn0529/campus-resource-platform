@@ -32,7 +32,7 @@ function displayTime(value: string) {
       aria-labelledby="page-title"
     >
       <p class="eyebrow">
-        PHASE 01 · 工程骨架
+        PHASE 02 · 数据库基线
       </p>
       <h1 id="page-title">
         服务运行状态

@@ -18,4 +18,8 @@ OQ-04 的签到码时区/唯一范围、OQ-07 的释放幂等契约、OQ-11 的�
 
 第一分项：数据库基线及真实 PostgreSQL 测试已完成。bootstrap 位于 deploy/postgres，四服务的 V1 位于各自 db/migration，D 的六份 seed 位于 db/seed/local。scripts/test-backend.sh 使用生产 bootstrap 创建 Testcontainers PostgreSQL 16，23 个测试全部通过（0 失败、0 错误、0 跳过），验证迁移、账号与 DDL/历史隔离、精确 seed、幂等及非 local 无 seed。
 
-Compose 空卷启动、持久卷重启及最终运行版本验证尚在执行，不能将本分项测试视为阶段全部验收完成。完整命令、结果、剩余内容与提交记录将在本阶段验证报告中补齐。
+第二分项：四个后端及 Web 镜像实际构建成功。确认旧开发库用户表数为 0 后，仅对本项目执行 `docker compose down -v`，再 `docker compose up -d --wait --wait-timeout 180`，七容器全部健康。数据库脚本经 TCP 核对八账号、四个 V1、隔离和精确 seed；随后不删除卷执行 down/up，数据计数及既有密码哈希指纹完全一致。前端 lint、6 项测试及生产构建通过，页面阶段标识更新为数据库基线。
+
+完整命令、关键文件、实际问题、结果和后续边界见 [Phase 2 验证记录](../review/phase-2-validation.md)。基础数据库代码已以 `feat(database): isolate service schemas and add local seed migrations` 提交 `1098586053b4bfc17d29d5b86251f32b9692199e`；第二分项建议并使用 `docs(database): record fresh-start verification and phase 2 handoff`。交付后停止，等待 Phase 3 确认。schema 与架构仍经 [草稿 PR #3](https://github.com/Liinn0529/campus-resource-platform/pull/3) 待人工 review，未自动合并。
+
+交付时按最终 GitHub 提交重新构建，最终 SHA、构建时间和 smoke/数据库结果记录于仓库外交付报告，避免在尚未生成的提交中预填自身 SHA。
