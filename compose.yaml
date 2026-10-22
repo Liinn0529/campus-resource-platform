@@ -6,6 +6,8 @@ x-backend: &backend
   mem_limit: 512m
   security_opt: [no-new-privileges:true]
   cap_drop: [ALL]
+  depends_on:
+    postgres: {condition: service_healthy}
 
 x-build: &backend-build
   context: .
@@ -23,8 +25,17 @@ services:
       POSTGRES_DB: campus_resource
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run ./scripts/init-env.sh first}
+      PLATFORM_DB_PASSWORD: ${PLATFORM_DB_PASSWORD:?Run ./scripts/init-env.sh first}
+      PLATFORM_FLYWAY_PASSWORD: ${PLATFORM_FLYWAY_PASSWORD:?Run ./scripts/init-env.sh first}
+      RESERVATION_DB_PASSWORD: ${RESERVATION_DB_PASSWORD:?Run ./scripts/init-env.sh first}
+      RESERVATION_FLYWAY_PASSWORD: ${RESERVATION_FLYWAY_PASSWORD:?Run ./scripts/init-env.sh first}
+      CLASSROOM_DB_PASSWORD: ${CLASSROOM_DB_PASSWORD:?Run ./scripts/init-env.sh first}
+      CLASSROOM_FLYWAY_PASSWORD: ${CLASSROOM_FLYWAY_PASSWORD:?Run ./scripts/init-env.sh first}
+      MAINTENANCE_DB_PASSWORD: ${MAINTENANCE_DB_PASSWORD:?Run ./scripts/init-env.sh first}
+      MAINTENANCE_FLYWAY_PASSWORD: ${MAINTENANCE_FLYWAY_PASSWORD:?Run ./scripts/init-env.sh first}
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - ./deploy/postgres/010-service-databases.sh:/docker-entrypoint-initdb.d/010-service-databases.sh:ro
     networks: [backend]
     healthcheck:
       test: [CMD-SHELL, "pg_isready -U postgres -d campus_resource"]
@@ -35,6 +46,14 @@ services:
 
   platform-service:
     <<: *backend
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/campus_resource?currentSchema=platform
+      DB_USERNAME: platform_app
+      DB_PASSWORD: ${PLATFORM_DB_PASSWORD:?Run ./scripts/init-env.sh first}
+      FLYWAY_USERNAME: platform_migrator
+      FLYWAY_PASSWORD: ${PLATFORM_FLYWAY_PASSWORD:?Run ./scripts/init-env.sh first}
+      SPRING_PROFILES_ACTIVE: local
+      CAMPUS_SEED_PASSWORD: ${DEV_SEED_PASSWORD:?Run ./scripts/init-env.sh first}
     build:
       <<: *backend-build
       args:
@@ -42,6 +61,12 @@ services:
         SERVICE_NAME: platform-service
   reservation-service:
     <<: *backend
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/campus_resource?currentSchema=reservation
+      DB_USERNAME: reservation_app
+      DB_PASSWORD: ${RESERVATION_DB_PASSWORD:?Run ./scripts/init-env.sh first}
+      FLYWAY_USERNAME: reservation_migrator
+      FLYWAY_PASSWORD: ${RESERVATION_FLYWAY_PASSWORD:?Run ./scripts/init-env.sh first}
     build:
       <<: *backend-build
       args:
@@ -49,6 +74,12 @@ services:
         SERVICE_NAME: reservation-service
   classroom-service:
     <<: *backend
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/campus_resource?currentSchema=classroom
+      DB_USERNAME: classroom_app
+      DB_PASSWORD: ${CLASSROOM_DB_PASSWORD:?Run ./scripts/init-env.sh first}
+      FLYWAY_USERNAME: classroom_migrator
+      FLYWAY_PASSWORD: ${CLASSROOM_FLYWAY_PASSWORD:?Run ./scripts/init-env.sh first}
     build:
       <<: *backend-build
       args:
@@ -56,6 +87,12 @@ services:
         SERVICE_NAME: classroom-service
   maintenance-service:
     <<: *backend
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/campus_resource?currentSchema=maintenance
+      DB_USERNAME: maintenance_app
+      DB_PASSWORD: ${MAINTENANCE_DB_PASSWORD:?Run ./scripts/init-env.sh first}
+      FLYWAY_USERNAME: maintenance_migrator
+      FLYWAY_PASSWORD: ${MAINTENANCE_FLYWAY_PASSWORD:?Run ./scripts/init-env.sh first}
     build:
       <<: *backend-build
       args:

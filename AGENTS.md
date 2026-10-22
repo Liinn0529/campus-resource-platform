@@ -2,11 +2,11 @@
 
 ## 当前阶段与依据
 
-Phase 0 已交付，用户在交付后回复“继续”，现已授权 Phase 1：工程骨架。Phase 1 完成后必须停止，等待用户明确确认才能进入 Phase 2。一次只完成一个 Phase；上传 GitHub、创建 PR 或审核文档均不等于批准下一阶段。
+Phase 0、Phase 1 已交付，用户在 Phase 1 交付后回复“继续”，现已授权 Phase 2：数据库。Phase 2 完成后必须停止，等待用户明确确认才能进入 Phase 3。一次只完成一个 Phase；上传 GitHub、创建 PR 或审核文档均不等于批准下一阶段。
 
 需求依据是 [原始执行文档](docs/requirements/CODEX_EXECUTION_PROMPT.md)，规范化需求见 [REQUIREMENTS](docs/requirements/REQUIREMENTS.md)，状态见 [TRACEABILITY](docs/requirements/TRACEABILITY.md)。保留未完成需求，不以删除条目消除欠账。发现冲突或歧义，记录并交由人工确认，不悄悄改写需求。
 
-Phase 0 历史基线只含文档与占位。当前 Phase 1 允许四个 Spring Boot 服务、Vue 应用、构建配置、Dockerfile、Compose、Nginx、health/info 和必要的骨架验证。禁止提前创建业务流程、四 schema/账号、Flyway migration、seed、认证/RBAC 业务或 CI/CD 工作流；这些分别属于后续阶段。
+Phase 0 为文档基线，Phase 1 为已运行的工程骨架。当前 Phase 2 允许四 schema、隔离迁移/应用账号、Flyway、最小 seed 所需公共数据表、数据库接入和真实数据库验证。禁止提前创建登录/JWT/RBAC 业务端点、预约/审批/工单流程、CI/CD。涉及未定业务规则的表按 Phase 2 设计记录保留到对应阶段，不把基础数据库完成说成全业务模型完成。
 
 ## 工程原则
 
@@ -53,4 +53,4 @@ schema、公共契约、跨模块变更必须人工 review。Git 语义冲突必
 
 Phase 0 以文档和目录的专属验收为准；业务逻辑、迁移、RBAC、Docker 和 CI 尚未实现且不适用本阶段，不能标为通过。每个 Phase 报告修改文件、关键设计、实际命令、测试结果、未完成内容和建议 commit message，随后停止等待人工确认。
 
-Phase 1 运行验收必须使用真实 Docker Compose：PostgreSQL、四服务、Web、Nginx 全部 healthy；每服务 health/info 返回真实状态与构建信息。数据库容器仅空实例，后端不使用共享数据库账号。Phase 0 验证文档保留为历史快照，其“无工程文件”检查只适用 Phase 0 提交。
+Phase 1 历史验收为七容器 healthy、health/info 真实、数据库为空实例。Phase 2 必须以真实 PostgreSQL 验证各账号仅访问自身 schema、应用无 DDL/迁移历史修改权限、Flyway 空库自动重放、精确 seed 数量与幂等；按原文对本项目开发数据库执行 down -v / up -d 验收前先确认没有需保留的业务数据，不操作其他项目。保留历史报告，不将 Phase 0/1 的专属范围检查用于新阶段。

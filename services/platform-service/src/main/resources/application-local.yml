@@ -1,0 +1,3 @@
+campus:
+  seed:
+    password: ${CAMPUS_SEED_PASSWORD}
