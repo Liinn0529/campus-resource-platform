@@ -2,22 +2,51 @@ package cn.campus.resource.maintenance;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import cn.campus.resource.testing.DatabaseTestSupport;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Map;
+import javax.sql.DataSource;
+import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.info.BuildProperties;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.HttpStatus;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
+@Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class RuntimeEndpointsTest {
+    @Container
+    private static final PostgreSQLContainer<?> DATABASE = DatabaseTestSupport.newContainer();
+
+    @DynamicPropertySource
+    static void databaseProperties(DynamicPropertyRegistry properties) {
+        DatabaseTestSupport.register(properties, DATABASE, "maintenance");
+    }
+
+    @Autowired
+    private DataSource dataSource;
+
+    @Autowired
+    private Flyway flyway;
+
     @Autowired
     private TestRestTemplate http;
 
     @Autowired
     private BuildProperties build;
+
+    @Test
+    void migratesItsSchemaAndEnforcesDatabaseOwnership() throws SQLException {
+        DatabaseTestSupport.assertMigratedAndIsolated(dataSource, flyway, DATABASE, "maintenance");
+    }
 
     @Test
     void exposesHealthWithoutLeakingDetails() {

@@ -7,7 +7,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-打开终端显示的本地地址。Vite 将 `/status` 请求代理至 `http://127.0.0.1:18080`，该地址由 Compose 网关提供。网关尚未启动时，页面会显示接口连接失败；不会生成模拟健康或构建数据。完整运行方式见后续容器运行手册。
+打开终端显示的本地地址。Vite 将 `/status` 请求代理至 `http://127.0.0.1:18080`，该地址由 Compose 网关提供。网关尚未启动时，页面会显示接口连接失败；不会生成模拟健康或构建数据。完整运行与 Phase 2 数据库准备见[容器运行手册](local-development.md)。
 
 ```sh
 pnpm lint

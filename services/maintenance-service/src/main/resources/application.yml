@@ -1,6 +1,22 @@
 spring:
   application:
     name: maintenance-service
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 5
+      connection-timeout: 5000
+  flyway:
+    url: ${spring.datasource.url}
+    user: ${FLYWAY_USERNAME}
+    password: ${FLYWAY_PASSWORD}
+    default-schema: maintenance
+    schemas: [maintenance]
+    create-schemas: false
+    clean-disabled: true
+    validate-migration-naming: true
 server:
   port: 8080
   shutdown: graceful
