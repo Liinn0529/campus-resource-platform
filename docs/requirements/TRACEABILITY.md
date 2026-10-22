@@ -2,13 +2,13 @@
 
 来源与需求正文见 [REQUIREMENTS.md](REQUIREMENTS.md)，原文见 [CODEX_EXECUTION_PROMPT.md](CODEX_EXECUTION_PROMPT.md)。每个需求 ID 对应一行；保留原文要求的 `ID | Requirement | Module | API/Page | Test | Status` 六列，并增加 Source、Phase。
 
-**当前执行 Phase 1。** 前端状态页和四后端骨架已有实际验证；七容器联调进行中。标为“计划，未执行”的 Test 仍只表示后续计划。业务、migration、完整 RBAC、CI/CD 尚未实现。
+**当前执行 Phase 1。** 前端状态页、四后端和七容器联调均已有实际验证。标为“计划，未执行”的 Test 仍只表示后续计划。业务、migration、完整 RBAC、CI/CD 尚未实现。
 
 状态语义：TODO=尚未实现/验证；PARTIAL=部分交付且仍需验收；BLOCKED=无法继续且已记录原因；DONE=阶段适用的验收完成并有真实证据。Phase 0 八条文档项为历史 DONE；Phase 1 仅按真实结果逐项更新。DONE 不代表人工已批准下一阶段；持续约束不因写入文档而完成。
 
 未决问题 OQ-01..15 详见 REQUIREMENTS.md。它们不阻塞本次文档基线，但相关实现前必须确认。无实际实现时，不以 BLOCKED 伪装已启动；这里全部保留 TODO。
 
-验收证据：历史 [Phase 0](../review/phase-0-validation.md)、[前端分项](../review/phase-1-frontend.md)、[后端分项](../review/phase-1-backend.md)。
+验收证据：历史 [Phase 0](../review/phase-0-validation.md)、[前端分项](../review/phase-1-frontend.md)、[后端分项](../review/phase-1-backend.md)、[Phase 1 总体验收](../review/phase-1-validation.md)。
 
 ## Phase 0 文档交付
 
@@ -44,11 +44,11 @@
 
 | ID | Requirement | Module | API/Page | Test | Status | Source | Phase |
 |---|---|---|---|---|---|---|---|
-| REQ-ARCH-001 | 使用 Monorepo、前后端分离、四个后端服务、REST API 和 PostgreSQL；清晰区分 D、M1、M2、M3。 | D/M1/M2/M3 | 四服务及 apps/web | 计划，未执行：架构审查与服务运行检查 | TODO | §一、四、五 | 0 设计; 1 实现 |
-| REQ-ARCH-002 | 后端采用 Java 21、Spring Boot 3.x、Spring Security、MyBatis、PostgreSQL、Flyway、Maven、Bean Validation、OpenAPI 3、JUnit 5、Testcontainers、JaCoCo。 | 全局 | 后端依赖与构建 | 计划，未执行：依赖清单及版本核对 | TODO | §三 | 1 起 |
-| REQ-ARCH-003 | 前端采用 Vue 3、TypeScript、Vite、Vue Router、Pinia、Element Plus、Axios、Vitest、Playwright。 | Web | apps/web | 计划，未执行：依赖清单及构建核对 | TODO | §三 | 1 起 |
-| REQ-ARCH-004 | 运维采用 Docker、Docker Compose、Nginx、GitHub Actions、华为云 SWR/ECS/RDS PostgreSQL。 | 运维 | deploy; .github/workflows | 计划，未执行：部署配置与环境核对 | TODO | §三 | 1/11–14 |
-| REQ-ARCH-005 | 遵循附录 A 的目标目录；Phase 0 只建文档与空目录，pom.xml、package.json、pnpm-workspace.yaml 等工程文件留后续。 | 全局 | 仓库目录 | 计划，未执行：文件树及阶段范围核对 | TODO | §四 | 0 目录; 1 起文件 |
+| REQ-ARCH-001 | 使用 Monorepo、前后端分离、四个后端服务、REST API 和 PostgreSQL；清晰区分 D、M1、M2、M3。 | D/M1/M2/M3 | 四服务及 apps/web | 已执行：四服务/Web/PG 空实例运行；业务数据库接入待 Phase 2 | PARTIAL | §一、四、五 | 0 设计; 1 实现 |
+| REQ-ARCH-002 | 后端采用 Java 21、Spring Boot 3.x、Spring Security、MyBatis、PostgreSQL、Flyway、Maven、Bean Validation、OpenAPI 3、JUnit 5、Testcontainers、JaCoCo。 | 全局 | 后端依赖与构建 | 已执行：Java/Boot/Security/Validation/JUnit/JaCoCo；DB/OpenAPI/Testcontainers 待后续 | PARTIAL | §三 | 1 起 |
+| REQ-ARCH-003 | 前端采用 Vue 3、TypeScript、Vite、Vue Router、Pinia、Element Plus、Axios、Vitest、Playwright。 | Web | apps/web | 已执行：Vue 栈、6 tests/lint/build；业务 Playwright 待 Phase 10 | PARTIAL | §三 | 1 起 |
+| REQ-ARCH-004 | 运维采用 Docker、Docker Compose、Nginx、GitHub Actions、华为云 SWR/ECS/RDS PostgreSQL。 | 运维 | deploy; .github/workflows | 已执行：Docker/Compose/Nginx 真实运行；Actions/华为云待后续 | PARTIAL | §三 | 1/11–14 |
+| REQ-ARCH-005 | 遵循附录 A 的目标目录；Phase 0 只建文档与空目录，pom.xml、package.json、pnpm-workspace.yaml 等工程文件留后续。 | 全局 | 仓库目录 | 已执行：本阶段构建/应用/脚本文件；后续目录仍保留占位 | PARTIAL | §四 | 0 目录; 1 起文件 |
 | REQ-ARCH-006 | 跨模块只能通过 HTTP API；业务服务通过 D 获取其拥有的身份、权限和空间主数据；M2/M3 通过 M1 创建及释放房间占用。 | D/M1/M2/M3 | 服务间 HTTP 契约 | 计划，未执行：跨服务测试及静态边界审查 | TODO | §一、五、六 | 0 设计; 3–8 实现 |
 | REQ-ARCH-007 | 一个 PostgreSQL 实例包含 platform、reservation、classroom、maintenance 四个独立 schema；各服务仅拥有对应 schema。 | D/M1/M2/M3 | PostgreSQL | 计划，未执行：schema 所有权及空库初始化验证 | TODO | §六 | 2 |
 | REQ-ARCH-008 | 每服务独立数据库账号且只可访问自身 schema；禁止跨 schema SQL、跨服务直接读表或写表。 | D/M1/M2/M3 | 数据库角色与授权 | 计划，未执行：使用各账号尝试跨 schema 访问应拒绝 | TODO | §六 | 2 |
@@ -220,7 +220,7 @@
 
 | ID | Requirement | Module | API/Page | Test | Status | Source | Phase |
 |---|---|---|---|---|---|---|---|
-| REQ-OPS-001 | 开发 Compose 包含 postgres、四业务服务、web、nginx；mailhog 可选。 | 运维 | deploy/compose | 计划，未执行：docker compose up -d 后全部 healthy | TODO | §三十; Phase 1 | 1 |
+| REQ-OPS-001 | 开发 Compose 包含 postgres、四业务服务、web、nginx；mailhog 可选。 | 运维 | compose.yaml; deploy/nginx/nginx.conf | 已执行：compose up -d、七容器 healthy 与 HTTP smoke | DONE | §三十; Phase 1 | 1 |
 | REQ-OPS-002 | 生产数据库不得放入应用 Compose，使用独立数据库服务。 | 运维 | 生产 Compose | 计划，未执行：配置审查与外部数据库连接 | TODO | §三十 | 13/14 |
 | REQ-OPS-003 | PR 流水线依次执行 checkout、backend lint、backend test、frontend lint、frontend unit test、integration test、build、docker build。 | CI | .github/workflows/ci.yml | 计划，未执行：完整 CI 实际运行 | TODO | §三十一; Phase 11 | 11 |
 | REQ-OPS-004 | 任一步骤失败立即停止；lint、test、build 失败不能合并。 | CI | CI / 分支保护 | 计划，未执行：各类失败与合并门禁验证 | TODO | §三十一; Phase 11 | 11 |
@@ -265,7 +265,7 @@
 
 | ID | Requirement | Module | API/Page | Test | Status | Source | Phase |
 |---|---|---|---|---|---|---|---|
-| REQ-PH-001 | 仅获下一阶段确认后创建 4 Spring Boot services、1 Vue app、Dockerfile、Compose、Nginx；每服务有 health/info，docker compose up -d 后全部 healthy。 | 全局 | 工程骨架 | 已执行：后端 16 tests、前端 6 tests/build；待七容器验收 | PARTIAL | Phase 1 | 1 |
+| REQ-PH-001 | 仅获下一阶段确认后创建 4 Spring Boot services、1 Vue app、Dockerfile、Compose、Nginx；每服务有 health/info，docker compose up -d 后全部 healthy。 | 全局 | 工程骨架 | 已执行：后端 16 tests、前端 6 tests/build、七容器/HTTP/浏览器验收 | DONE | Phase 1 | 1 |
 | REQ-PH-002 | 建四 schema、独立账号、Flyway、最小 seed；开发环境 docker compose down -v 后 up -d，全新数据库自动 migration。 | 数据库 | 数据库工程 | 计划，未执行：空库完整初始化验收 | TODO | Phase 2 | 2 |
 | REQ-PH-003 | 实现 login、RBAC、user、role、permission、building、room、seat、settings、checkin code、audit；管理员能维护空间，学生无管理权限，后端 RBAC 生效。 | D | D 公共层 | 计划，未执行：真实管理与权限验收 | TODO | Phase 3 | 3 |
 | REQ-PH-004 | 实现房间/座位/可用性查询、创建、取消、历史、再预约、room_gate、seat_occupancy；验收不能重复预约、默认 4 小时、插座过滤、历史再预约。 | M1 | M1 基础预约 | 计划，未执行：四项业务验收 | TODO | Phase 4 | 4 |
@@ -284,7 +284,7 @@
 ## 基线统计与更新规则
 
 - 需求总数：186。
-- 当前状态：DONE 10；TODO 175；PARTIAL 1；BLOCKED 0。
+- 当前状态：DONE 12；TODO 169；PARTIAL 5；BLOCKED 0。
 - 分类计数：REQ-P0: 8, REQ-GOV: 12, REQ-ARCH: 12, REQ-DATA: 12, REQ-D: 8, REQ-M1: 17, REQ-M2: 10, REQ-M3: 12, REQ-API: 8, REQ-SEC: 12, REQ-ENG: 9, REQ-UI: 9, REQ-TEST: 12, REQ-OPS: 16, REQ-AGENT: 7, REQ-ETH: 7, REQ-PH: 15。
 - API/Page 和 Test 的计划内容须在对应阶段替换/补充为真实契约、代码/测试路径和执行证据；保留源要求与稳定 ID。
 - 标记 DONE 前，检查源 §三十九 DoD 和本阶段适用范围，更新实际验收记录；不得把计划测试名称、文档审阅或工具退出码冒充业务测试通过。

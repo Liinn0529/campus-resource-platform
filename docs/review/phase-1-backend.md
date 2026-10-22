@@ -15,4 +15,4 @@
 
 编译提示测试中的 Map 原始类型有 unchecked 使用；测试运行出现 Spring Boot 测试依赖 Mockito/Byte Buddy 动态 agent 提示。这些不是失败，当前没有将“无 warning”写为结果。没有声称完整业务覆盖率、Testcontainers、RBAC/JWT 或 GitHub CI 已完成。
 
-关联 REQ-D-008、REQ-ENG-007；REQ-PH-001 的七容器验收仍待完成。
+关联 REQ-D-008、REQ-ENG-007；后端分项提交时，REQ-PH-001 的七容器验收仍待完成，后续结果见 [Phase 1 总体验收](phase-1-validation.md)。

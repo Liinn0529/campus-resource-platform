@@ -13,7 +13,7 @@
 | `pnpm build` | 退出 0，生成实际 dist；不提交构建产物 |
 | `pnpm dev` 与 `GET http://127.0.0.1:5173/` | Vite 启动，实际 HTML 返回 200 |
 
-生产请求直接访问网关 `/status/{service}/{health,info}`。本分项尚未完成真实后端联调、容器 Web 和浏览器验收；这些验证在 Phase 1 总体验收中继续。REQ-PH-001 此时仍未完成。
+生产请求直接访问网关 `/status/{service}/{health,info}`。初次前端分项提交时，真实后端联调、容器 Web 和浏览器尚待验收；REQ-PH-001 当时未完成。后续结果见下面的追加记录与 [Phase 1 总体验收](phase-1-validation.md)。
 
 ## Web 容器分项追加验证
 
