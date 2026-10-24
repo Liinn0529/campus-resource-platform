@@ -27,18 +27,25 @@ class NonLocalDatabaseTest {
                         "--spring.datasource.username=platform_app",
                         "--spring.datasource.password=" + DatabaseTestSupport.appPassword("platform"),
                         "--spring.flyway.user=platform_migrator",
-                        "--spring.flyway.password=" + DatabaseTestSupport.migratorPassword("platform"))) {
+                        "--spring.flyway.password=" + DatabaseTestSupport.migratorPassword("platform"),
+                        "--campus.jwt.secret=test-only-nonlocal-jwt-secret-at-least-32-bytes",
+                        "--campus.business-zone=Asia/Shanghai",
+                        "--campus.internal.reservation-token=test-only-reservation-internal-token-at-least-32-bytes",
+                        "--campus.internal.classroom-token=test-only-classroom-internal-token-at-least-32-bytes",
+                        "--campus.internal.maintenance-token=test-only-maintenance-internal-token-at-least-32-bytes")) {
             assertThat(application.getBeansOfType(LocalDemoSeed.class)).isEmpty();
             var flyway = application.getBean(Flyway.class);
             flyway.validate();
-            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("1");
+            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("3");
             var jdbc = application.getBean(JdbcTemplate.class);
-            for (String table : List.of("user", "role", "permission", "user_role",
-                    "role_permission", "building", "room", "seat")) {
+            for (String table : List.of("user", "user_role", "building", "room", "seat",
+                    "user_room_scope", "room_checkin_code", "audit_log")) {
                 assertThat(jdbc.queryForObject(
                         "SELECT COUNT(*) FROM platform.\"" + table + "\"", Integer.class))
                         .as("non-local platform.%s must be empty", table).isZero();
             }
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM platform.role", Integer.class)).isEqualTo(7);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM platform.permission", Integer.class)).isEqualTo(14);
         }
     }
 }
