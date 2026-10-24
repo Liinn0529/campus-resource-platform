@@ -23,4 +23,6 @@ OQ-04/10/12/14 的本阶段选择在 API 和测试中具体化，作为 PR 待�
 
 第一分项已执行 `./scripts/test-backend.sh`：49 项真实 PostgreSQL/HTTP/JWT 测试全部通过（0 失败/错误/跳过）。前端 lint、6 项测试、类型检查与生产构建通过；Nginx 实际配置检查和 Compose config 检查通过。身份、用户管理、空间/参数/签到码/审计及 32 操作 OpenAPI 已完成代码分项，按用户要求先提交 GitHub。
 
-Compose 升级、真实网关维护操作、最终 SHA/镜像一致性和完整阶段交付仍在执行，不能将上述测试结果替代运行验收。完整文件、命令、结果和未完成内容将在验证记录补齐；Phase 4 不在本轮范围。
+第二分项已保留原卷完成 V1→V3 升级，验证五个既有密码哈希和演示实体未改变、七容器健康；真实网关登录、管理员维护、学生与跨房间越权拒绝、今日码、审计及内部隔离全部通过，运行修改逐项恢复。新增脚本、页面标识和手册以 `test(platform): verify compose upgrade and phase 3 handoff` 提交。
+
+第一分项提交为 `c5fd067012ea40c8a9163261e0bb9b68f4c71a19`；文件、设计、命令、结果、失败修复及未完成内容见 [Phase 3 验证记录](../review/phase-3-validation.md)。本阶段 [草稿 PR #4](https://github.com/Liinn0529/campus-resource-platform/pull/4) 待人工 review，未自动合并。交付时按最终 GitHub SHA 重建并将 SHA/镜像一致性与再次运行结果保存于仓库外报告，避免预填自身提交。Phase 3 完成后停止，Phase 4 不在本轮范围。

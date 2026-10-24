@@ -1,14 +1,14 @@
-# 需求追踪矩阵（当前 Phase 2）
+# 需求追踪矩阵（当前 Phase 3）
 
 来源与需求正文见 [REQUIREMENTS.md](REQUIREMENTS.md)，原文见 [CODEX_EXECUTION_PROMPT.md](CODEX_EXECUTION_PROMPT.md)。每个需求 ID 对应一行；保留原文要求的 `ID | Requirement | Module | API/Page | Test | Status` 六列，并增加 Source、Phase。
 
-**Phase 2 已完成，等待 Phase 3 确认。** 已交付四 schema、四对独立 migrator/app 账号、各服务 Flyway V1、D 八张基础表与精确最小 seed；真实 Testcontainers PostgreSQL 的 JUnit 共 23 项通过。开发 Compose 实际完成 down -v 后空卷自动迁移，以及保留卷重启后的计数/密码哈希不变验证，七容器健康。标为“计划，未执行”的 Test 仍只表示后续计划。完整业务模型、登录/JWT/RBAC、CI/CD 尚未实现；本阶段 schema 方案经草稿 PR 等待人工 review。
+**Phase 3 功能与本地运行验收已完成，等待 Phase 4 确认。** Phase 2 的四 schema/八账号/V1/最小 seed 及 23 项测试、Compose 历史记录保留。当前 D 实现 V2/V3、32 个公开/内部操作及身份、权限范围、空间、参数、每日码、审计的真实 HTTP/PostgreSQL 测试，完整套件已执行并由 Surefire 核对：49 项通过、0 失败、0 错误、0 跳过，前端 6 项及 lint/类型检查/生产构建也通过；五个应用镜像已实际构建，保留原 Phase 2 数据卷从 V1 升级至 V3，五用户密码指纹与原演示实体不变；七容器 healthy，公共层 smoke、数据库隔离/审计保护、CORS 和日志抽查通过。最终干净 GitHub 提交的重建元数据由交付报告另记，不预填未执行结果。Phase 4 预约/实际签到、审批、工单、完整 Web、CI/CD 及云部署仍未实现或未授权。schema/公共契约仍待草稿 PR 人工 review。
 
-状态语义：TODO=尚未实现/验证；PARTIAL=部分交付且仍需验收；BLOCKED=无法继续且已记录原因；DONE=阶段适用的验收完成并有真实证据。Phase 0/1 结果保留为历史；Phase 2 仅按真实结果逐项更新。DONE 不代表人工已批准 schema、合并 PR 或下一阶段；持续约束不因写入文档而完成。
+状态语义：TODO=尚未实现/验证；PARTIAL=部分交付且仍需验收；BLOCKED=无法继续且已记录原因；DONE=阶段适用的验收完成并有真实证据。Phase 0–2 结果保留为历史；Phase 3 仅按真实结果逐项更新。DONE 不代表人工已批准 schema、合并 PR 或下一阶段；持续约束不因写入文档而完成。
 
-未决问题 OQ-01..15 详见 REQUIREMENTS.md。Phase 2 解决 OQ-13 的账号/授权与 D 基础表方案，其他业务内容仍保留到各相关实现前确认。无实际实现时，不以 BLOCKED 伪装已启动；未创建的业务表继续 TODO，不能以四 schema 存在宣称业务模型完成。
+未决问题 OQ-01..15 全部保留，详见 REQUIREMENTS.md。Phase 3 为 OQ-04/10/12/13/14 提供 D 范围内具体待审方案；不将阶段授权、文档或测试当作人工已批准，不据此宣称后续业务政策已解决。无实际实现时不以 BLOCKED 伪装已启动；M1/M2/M3 未建业务表继续 TODO。
 
-验收证据：历史 [Phase 0](../review/phase-0-validation.md)、[前端分项](../review/phase-1-frontend.md)、[后端分项](../review/phase-1-backend.md)、[Phase 1 总体验收](../review/phase-1-validation.md)；当前 [Phase 2 验证记录](../review/phase-2-validation.md)、[计划与执行记录](../plans/phase-2.md)、[数据库边界和 23 项真实测试范围](../architecture/DATA_OWNERSHIP.md#7-当前验证与后续边界)。实际测试入口为 `scripts/test-backend.sh`，公共断言为 `tests/java/cn/campus/resource/testing/DatabaseTestSupport.java`，各服务测试位于各自 `src/test/java/`。
+验收证据：历史 [Phase 0](../review/phase-0-validation.md)、[前端分项](../review/phase-1-frontend.md)、[后端分项](../review/phase-1-backend.md)、[Phase 1 总体验收](../review/phase-1-validation.md)；[Phase 2 历史验证记录](../review/phase-2-validation.md)；当前 [Phase 3 计划](../plans/phase-3.md)、[平台 API](../api/platform.md)、[OpenAPI](../../contracts/openapi/platform.v1.json)和[数据/测试边界](../architecture/DATA_OWNERSHIP.md#7-当前验证与后续边界)。通过测试的首个功能分项已提交 [c5fd067](https://github.com/Liinn0529/campus-resource-platform/commit/c5fd067012ea40c8a9163261e0bb9b68f4c71a19)，位于[草稿 PR #4](https://github.com/Liinn0529/campus-resource-platform/pull/4)，不代表已合并或获人工批准。实际测试入口为 `scripts/test-backend.sh`，公共断言为 `tests/java/cn/campus/resource/testing/DatabaseTestSupport.java`，各服务测试位于各自 `src/test/java/`。
 
 ## Phase 0 文档交付
 
@@ -44,12 +44,12 @@
 
 | ID | Requirement | Module | API/Page | Test | Status | Source | Phase |
 |---|---|---|---|---|---|---|---|
-| REQ-ARCH-001 | 使用 Monorepo、前后端分离、四个后端服务、REST API 和 PostgreSQL；清晰区分 D、M1、M2、M3。 | D/M1/M2/M3 | 四服务及 apps/web | 已执行：工程骨架与四服务 PostgreSQL 接入；真实业务 REST API 留对应阶段 | PARTIAL | §一、四、五 | 0 设计; 1 实现 |
-| REQ-ARCH-002 | 后端采用 Java 21、Spring Boot 3.x、Spring Security、MyBatis、PostgreSQL、Flyway、Maven、Bean Validation、OpenAPI 3、JUnit 5、Testcontainers、JaCoCo。 | 全局 | 后端依赖与构建 | 已执行：原有 Java/Boot 栈、MyBatis/PostgreSQL/Flyway 接入、Testcontainers 23 项；OpenAPI 与业务使用待后续 | PARTIAL | §三 | 1 起 |
+| REQ-ARCH-001 | 使用 Monorepo、前后端分离、四个后端服务、REST API 和 PostgreSQL；清晰区分 D、M1、M2、M3。 | D/M1/M2/M3 | 四服务及 apps/web; D 公开/内部 API | 已交付工程骨架/隔离库；Phase 3 D 实现 32 操作，M1/M2/M3 业务 REST 仍待对应阶段 | PARTIAL | §一、四、五 | 0 设计; 1 实现 |
+| REQ-ARCH-002 | 后端采用 Java 21、Spring Boot 3.x、Spring Security、MyBatis、PostgreSQL、Flyway、Maven、Bean Validation、OpenAPI 3、JUnit 5、Testcontainers、JaCoCo。 | 全局 | 后端依赖/构建; contracts/openapi/platform.v1.json | 已执行：Java 21/Maven/Boot/Security/MyBatis/PostgreSQL/Flyway/Bean Validation/JUnit/Testcontainers/JaCoCo 构建和 49 项测试通过；静态 OpenAPI 与 32 个实际操作一致 | DONE | §三 | 1 起 |
 | REQ-ARCH-003 | 前端采用 Vue 3、TypeScript、Vite、Vue Router、Pinia、Element Plus、Axios、Vitest、Playwright。 | Web | apps/web | 已执行：Vue 栈、6 tests/lint/build；业务 Playwright 待 Phase 10 | PARTIAL | §三 | 1 起 |
 | REQ-ARCH-004 | 运维采用 Docker、Docker Compose、Nginx、GitHub Actions、华为云 SWR/ECS/RDS PostgreSQL。 | 运维 | deploy; .github/workflows | 已执行：Docker/Compose/Nginx 真实运行；Actions/华为云待后续 | PARTIAL | §三 | 1/11–14 |
 | REQ-ARCH-005 | 遵循附录 A 的目标目录；Phase 0 只建文档与空目录，pom.xml、package.json、pnpm-workspace.yaml 等工程文件留后续。 | 全局 | 仓库目录 | 已执行：本阶段构建/应用/脚本文件；后续目录仍保留占位 | PARTIAL | §四 | 0 目录; 1 起文件 |
-| REQ-ARCH-006 | 跨模块只能通过 HTTP API；业务服务通过 D 获取其拥有的身份、权限和空间主数据；M2/M3 通过 M1 创建及释放房间占用。 | D/M1/M2/M3 | 服务间 HTTP 契约 | 计划，未执行：跨服务测试及静态边界审查 | TODO | §一、五、六 | 0 设计; 3–8 实现 |
+| REQ-ARCH-006 | 跨模块只能通过 HTTP API；业务服务通过 D 获取其拥有的身份、权限和空间主数据；M2/M3 通过 M1 创建及释放房间占用。 | D/M1/M2/M3 | D 四个 internal 主数据/参数/验码 API; 后续调用方 | 已实现私网 D 契约、三调用方凭据和仅 M1 验码授权；真实 M1/M2/M3 客户端与占用业务仍未实现 | PARTIAL | §一、五、六 | 0 设计; 3–8 实现 |
 | REQ-ARCH-007 | 一个 PostgreSQL 实例包含 platform、reservation、classroom、maintenance 四个独立 schema；各服务仅拥有对应 schema。 | D/M1/M2/M3 | deploy/postgres/010-service-databases.sh; 四服务 datasource/Flyway | 已执行：真实 PostgreSQL 空库创建四 schema，各服务 V1 执行与自身 current_schema 核对 | DONE | §六 | 2 |
 | REQ-ARCH-008 | 每服务独立数据库账号且只可访问自身 schema；禁止跨 schema SQL、跨服务直接读表或写表。 | D/M1/M2/M3 | 四对 app/migrator 账号; DatabaseTestSupport | 已执行：各 app 本 schema DML；app/migrator 跨 schema 实际表读写均拒绝；app DDL/切换 owner/history 操作拒绝 | DONE | §六 | 2 |
 | REQ-ARCH-009 | 禁止无必要的 Kafka、Nacos、Consul、Service Mesh、Event Sourcing、CQRS；M2 第一版不实现 BPMN 引擎。 | 全局 | 架构与依赖 | 计划，未执行：依赖及设计审查 | TODO | §二、十三 | 0–15 |
@@ -65,26 +65,26 @@
 | REQ-DATA-002 | seat_occupancy 完整保留附录 B 的 11 个字段、可空性及来源枚举，能够追溯不可用来源。 | M1 | seat_occupancy | 计划，未执行：字段、约束和来源查询验证 | TODO | §七 | 2/4 |
 | REQ-DATA-003 | 建立 room_gate(room_id PRIMARY KEY)，房间级互斥所需行必须可获取。 | M1 | room_gate | 计划，未执行：主键约束与锁竞争集成验证 | TODO | §八 | 2/4 |
 | REQ-DATA-004 | 占用来源具有 (source_module, source_ref_id, source_type) 唯一约束。 | M1 | seat_occupancy | 计划，未执行：PostgreSQL 唯一约束与重复请求验证 | TODO | §九 | 2/8 |
-| REQ-DATA-005 | 建立 room_checkin_code，保留 room_id、date、code、created_at；每日每 room 一个码并由数据库唯一约束保证。 | D | platform.room_checkin_code | 计划，未执行：日期、房间、重复生成约束验证 | TODO | §十二 | 2/3 |
+| REQ-DATA-005 | 建立 room_checkin_code，保留 room_id、date、code、created_at；每日每 room 一个码并由数据库唯一约束保证。 | D | platform V2 room_checkin_code; CommonService | 已执行：真实 PostgreSQL V2、room/date 主键、Clock 上海日界、8 位码、并发 ensure 单记录/单审计和内部验码测试通过 | DONE | §十二 | 2/3 |
 | REQ-DATA-006 | 建立 classroom_request、approval_step、approval_action、classroom_event。 | M2 | classroom schema | 计划，未执行：migration 及审批行为集成验证 | TODO | §十三 | 2/6 |
-| REQ-DATA-007 | 建立 user、role、permission、user_role、role_permission，保留附录 C 的七类角色和权限示例。 | D | platform V1; db/seed/local/roles.sql | 已执行：五表、七角色及五用户角色关联；permission/role_permission 留空，权限矩阵与后端授权留 Phase 3 | PARTIAL | §十五 | 2/3 |
-| REQ-DATA-008 | 各服务 migration 放在 src/main/resources/db/migration/，使用 Flyway 版本命名，schema 版本化。 | D/M1/M2/M3 | 四服务 src/main/resources/db/migration/V1__*.sql | 已执行：各服务真实 Flyway 自动发现/执行 V1，validate 通过、applied 仅一条、版本为 1 | DONE | §二十四 | 2 起 |
-| REQ-DATA-009 | migration 只向前；不修改已经执行/发布的 migration，修复新增 migration；禁止手工修改生产 schema。 | D/M1/M2/M3 | Flyway / 生产变更流程 | 已执行：V1 版本化、Flyway validate、clean 禁用、app 迁移历史保护；未来迁移及生产流程持续检查 | PARTIAL | §二、二十四 | 2 起 |
-| REQ-DATA-010 | 全新空库可完整重放 migration；seed 与 schema migration 分离。 | D/M1/M2/M3 | 各服务 V1; platform db/seed/local; Testcontainers | 已执行：真实 PostgreSQL 空库自动 V1；独立 local seed 重放不增数据/重设密码；non-local V1 后八表为空 | DONE | §二十四; Phase 2 | 2 |
+| REQ-DATA-007 | 建立 user、role、permission、user_role、role_permission，保留附录 C 的七类角色和权限示例。 | D | platform V1–V3; ManagementService; AccessPolicy | 已执行：五表/七角色/原九权限示例及 14 项目录、初始 35 关系；角色/范围管理和后端授权测试通过，方案仍待人工 review | DONE | §十五 | 2/3 |
+| REQ-DATA-008 | 各服务 migration 放在 src/main/resources/db/migration/，使用 Flyway 版本命名，schema 版本化。 | D/M1/M2/M3 | 四服务 db/migration; D V1–V3 / 其他 V1 | 已执行：四服务真实 Flyway 自动发现/校验；D V1–V3 三条、其他各 V1 一条，已发布 V1 保持不变 | DONE | §二十四 | 2 起 |
+| REQ-DATA-009 | migration 只向前；不修改已经执行/发布的 migration，修复新增 migration；禁止手工修改生产 schema。 | D/M1/M2/M3 | Flyway; platform 新 V2/V3; 生产流程 | Phase 2 V1/validate/clean 禁用已验证；Phase 3 只追加迁移；未来迁移与生产流程持续审查 | PARTIAL | §二、二十四 | 2 起 |
+| REQ-DATA-010 | 全新空库可完整重放 migration；seed 与 schema migration 分离。 | D/M1/M2/M3 | 各服务 migration; D local seed 与 V3 参考目录 | 真实 PostgreSQL 空库 V1–V3/local seed/non-local 参考目录测试通过；Compose 保留 Phase 2 原卷升级 V1→V3，原演示实体和五用户密码指纹不变 | DONE | §二十四; Phase 2 | 2 |
 | REQ-DATA-011 | 只提供最小演示 seed：1 system admin、2 students、1 room admin、1 property staff、2 buildings、4 rooms、40 seats。 | D | LocalDemoSeed; 六份独立 SQL | 已执行：精确 5 用户/5 角色关系/2 楼/4 房/40 座；每房 10 座；BCrypt 匹配且重复运行保留已有密码 | DONE | §十九 | 2 |
-| REQ-DATA-012 | 禁止 AI 虚构业务数据或自动填满 seed；演示数据必须明确、最小且不冒充真实运营数据。 | 全局 | db/seed/local; LocalDemoSeed | 已执行：仅明确演示主数据、无额外用户或预约/审批/工单；后续数据与页面持续审查 | PARTIAL | §十九 | 2 起 |
+| REQ-DATA-012 | 禁止 AI 虚构业务数据或自动填满 seed；演示数据必须明确、最小且不冒充真实运营数据。 | 全局 | db/seed/local; V3 固定参考目录 | 保留原五演示用户/空间，无预约/审批/工单 seed；新增权限参考定义不增加演示用户，后续数据/页面持续审查 | PARTIAL | §十九 | 2 起 |
 
 ## D 公共层
 
 | ID | Requirement | Module | API/Page | Test | Status | Source | Phase |
 |---|---|---|---|---|---|---|---|
-| REQ-D-001 | platform-service 提供用户、角色、权限和 RBAC 管理；具体权限分配必须后端生效。 | D | 用户、角色、权限 API（待定义） | 计划，未执行：管理维护及学生越权拒绝 | TODO | §五.1; Phase 3 | 3 |
-| REQ-D-002 | 提供用户名/学号加密码登录并签发 JWT，第一版暂不接学校统一身份认证。 | D | 登录 API（待定义）; /login | 计划，未执行：正确/错误凭据与登录流程验证 | TODO | §五.1、十六; Phase 3 | 3 |
-| REQ-D-003 | 管理楼宇、教室、自习室与座位主数据，管理员可维护空间。 | D | 空间 API（待定义）; /admin/spaces、rooms、seats | 计划，未执行：空间维护与关联数据验证 | TODO | §五.1; Phase 3 | 3 |
-| REQ-D-004 | 管理系统参数，含最大连续预约时长；M1 通过约定 API 使用参数。 | D/M1 | 参数 API（待定义）; /admin/settings | 计划，未执行：参数维护和 M1 生效验证 | TODO | §五.1、十一; Phase 3 | 3/4 |
-| REQ-D-005 | 每房间每天生成 6–8 位随机字符签到码；提供校验所需能力，可生成 QR Code。 | D | 签到码 API（待定义） | 计划，未执行：随机长度、每日唯一、房间日期校验 | TODO | §五.1、十二; Phase 3 | 3 |
+| REQ-D-001 | platform-service 提供用户、角色、权限和 RBAC 管理；具体权限分配必须后端生效。 | D | ManagementController/Service; AccessPolicy | 已执行：ManagementApiTest 的用户/角色/权限/房间范围管理、学生拒绝、最后启用管理员并发保护等真实 HTTP/DB 测试通过 | DONE | §五.1; Phase 3 | 3 |
+| REQ-D-002 | 提供用户名/学号加密码登录并签发 JWT，第一版暂不接学校统一身份认证。 | D | POST /api/v1/auth/login; GET /me; 自助/管理改密 | 已执行：AuthenticationApiTest 12 项真实 HTTP/DB 通过；BCrypt 登录/改密、有效/错误/停用、签名/issuer/audience/严格到期/authVersion 及即时撤权 | DONE | §五.1、十六; Phase 3 | 3 |
+| REQ-D-003 | 管理楼宇、教室、自习室与座位主数据，管理员可维护空间。 | D | SpaceController/Service; buildings/rooms/seats | 已执行：CommonResourcesTest 管理员新建/修改/启停楼宇房间座位、关联/唯一键、学生/跨房间拒绝通过；本阶段无硬删除 | DONE | §五.1; Phase 3 | 3 |
+| REQ-D-004 | 管理系统参数，含最大连续预约时长；M1 通过约定 API 使用参数。 | D/M1 | GET/PUT /api/v1/settings; GET /internal/v1/settings | D 参数维护/默认 4/私网读取的真实测试已通过；M1 客户端与对既有/新预约生效留 Phase 4 | PARTIAL | §五.1、十一; Phase 3 | 3/4 |
+| REQ-D-005 | 每房间每天生成 6–8 位随机字符签到码；提供校验所需能力，可生成 QR Code。 | D | GET/POST /api/v1/rooms/{id}/checkin-code; internal verify | 已执行：每日 8 位随机码、room/date 唯一、Clock 上海日界、并发同条/单审计及 M1-only 校验测试通过；不含实际签到，QR 可选未实现 | DONE | §五.1、十二; Phase 3 | 3 |
 | REQ-D-006 | 提供通知接口，供 M1 提醒调用；实际渠道、投递状态和去重策略待确认，不用假通知宣称送达。 | D/M1 | 通知 API（待定义） | 计划，未执行：真实渠道与投递失败验证（待定） | TODO | §五.1、十一 | 3 契约; 5 实现 |
-| REQ-D-007 | 提供操作审计，支持授权查询；业务事件与公共审计之间通过 HTTP 契约关联。 | D | 审计 API（待定义）; /admin/audit | 计划，未执行：操作、操作者、请求关联及访问控制验证 | TODO | §五.1; Phase 3 | 3 |
+| REQ-D-007 | 提供操作审计，支持授权查询；业务事件与公共审计之间通过 HTTP 契约关联。 | D | AuditService/Mapper; GET /api/v1/audit-events | D 修改/审计同事务、授权查询、requestId 关联和 app UPDATE/DELETE 拒绝测试已通过；跨服务事件与公共审计的 HTTP 关联仍留后续 | PARTIAL | §五.1; Phase 3 | 3 |
 | REQ-D-008 | 每个服务都提供 health 与 version/info；D 的职责列表不替代其他服务自身端点。 | D/M1/M2/M3 | GET /actuator/health; GET /actuator/info | 已执行：四服务真实 HTTP 测试，见 phase-1-backend.md | DONE | §五.1、二十八 | 1 |
 
 ## M1 自习座位预约
@@ -145,41 +145,41 @@
 
 | ID | Requirement | Module | API/Page | Test | Status | Source | Phase |
 |---|---|---|---|---|---|---|---|
-| REQ-API-001 | 公开 API 使用 /api/v1，内部 API 使用 /internal/v1，OpenAPI 3 文档随真实契约维护。 | D/M1/M2/M3 | docs/api; contracts/openapi | 计划，未执行：路径与契约一致性验证 | TODO | §十七 | 1 契约; 3–8 实现 |
-| REQ-API-002 | 成功响应统一含 data、requestId；失败响应统一含 code、message、requestId，保留业务错误码。 | D/M1/M2/M3 | API 响应 | 计划，未执行：响应 schema 与错误映射验证 | TODO | §十七 | 3–8 |
-| REQ-API-003 | 按语义使用 200、201、204、400、401、403、404、409、422、500、503；禁止所有接口都返回 200。 | D/M1/M2/M3 | 全部 API | 计划，未执行：状态码矩阵验证 | TODO | §十七 | 3–8 |
+| REQ-API-001 | 公开 API 使用 /api/v1，内部 API 使用 /internal/v1，OpenAPI 3 文档随真实契约维护。 | D/M1/M2/M3 | D 公开 /api/v1 与私网 /internal/v1; OpenAPI JSON | 已静态核对 OpenAPI 与 32 个 Controller 操作/参数/认证一致，D 真实 HTTP 测试通过；其他模块 API 随后续阶段维护 | PARTIAL | §十七 | 1 契约; 3–8 实现 |
+| REQ-API-002 | 成功响应统一含 data、requestId；失败响应统一含 code、message、requestId，保留业务错误码。 | D/M1/M2/M3 | ApiEnvelope; ApiErrors; ApiExceptionHandler | D 真实成功/失败 envelope 与 X-Request-ID 关联测试通过；网关自身错误与后续模块契约继续维护 | PARTIAL | §十七 | 3–8 |
+| REQ-API-003 | 按语义使用 200、201、204、400、401、403、404、409、422、500、503；禁止所有接口都返回 200。 | D/M1/M2/M3 | D Controller/异常/权限边界 | D 200/201/400/401/403/404/409/422 等真实 API 状态测试通过；暂无硬删除/204，其他模块及部署故障语义持续适用 | PARTIAL | §十七 | 3–8 |
 | REQ-API-004 | 提供 POST /internal/v1/room-blocks，请求字段 roomId、startAt、endAt、sourceModule、sourceType、sourceRefId 与附录 D 一致。 | M1/M2/M3 | POST /internal/v1/room-blocks | 计划，未执行：M2/M3 示例及非法组合契约测试 | TODO | §九 | 8 |
 | REQ-API-005 | 提供 DELETE /internal/v1/room-blocks/{sourceModule}/{sourceRefId} 释放来源占用；不得擅自更改路径解决三元唯一键歧义。 | M1/M2/M3 | DELETE /internal/v1/room-blocks/{sourceModule}/{sourceRefId} | 计划，未执行：释放目标、重复释放及歧义确认后的契约测试 | TODO | §九 | 8 |
 | REQ-API-006 | 同一来源重复请求内容一致返回已有结果，内容冲突返回 409 Conflict；不能产生重复占用。 | M1/M2/M3 | room-blocks API | 计划，未执行：同键同载荷、同键异载荷及并发重复测试 | TODO | §九 | 8 |
 | REQ-API-007 | 只重试网络错误和 5xx，不重试 4xx，最多 3 次，超出进入 SYNC_FAILED；“3 次”计数口径待确认。 | M2/M3/M1 | HTTP client / 同步任务 | 计划，未执行：错误类别、次数上限与持久状态验证 | TODO | §十 | 6–8 |
-| REQ-API-008 | API、HTTP client 和前端数据必须来自真实业务实现，公共契约更新后经人工审查并同步文档。 | D/M1/M2/M3 | API 文档 / 调用方 | 计划，未执行：契约差异与真实链路检查 | TODO | §一、十七、三十九 | 3–15 |
+| REQ-API-008 | API、HTTP client 和前端数据必须来自真实业务实现，公共契约更新后经人工审查并同步文档。 | D/M1/M2/M3 | D API/OpenAPI/草稿 PR; 后续 HTTP 调用方 | D MyBatis/HTTP 实现与 32 操作契约同步，49 项后端测试通过；草稿 PR 待人工 review，后续客户端/业务 Web 尚未实现 | PARTIAL | §一、十七、三十九 | 3–15 |
 
 ## 认证、授权和安全边界
 
 | ID | Requirement | Module | API/Page | Test | Status | Source | Phase |
 |---|---|---|---|---|---|---|---|
-| REQ-SEC-001 | 密码使用 BCrypt 存储和校验，不保存明文或可逆密码。 | D | LocalDemoSeed; platform."user"; 后续登录/改密 | 已执行：5 个独立 BCrypt(12) seed 哈希及真实密码匹配；登录/改密与错误密码验证留 Phase 3 | PARTIAL | §十六、二十九 | 3 |
-| REQ-SEC-002 | JWT 必须验证且有 expiration；失效、过期或篡改凭证不能认证。 | D/全服务 | JWT 校验 | 计划，未执行：有效、过期、篡改 token 测试 | TODO | §十六、二十九 | 3 |
-| REQ-SEC-003 | 权限必须后端校验，前端隐藏按钮不能作为权限控制；角色与个人数据范围隔离。 | 全服务/Web | API 安全边界 | 计划，未执行：401、403、横向/纵向越权测试 | TODO | §十五、二十九 | 3 起 |
-| REQ-SEC-004 | RBAC 保留附录 C 的角色和权限示例；角色到权限及组织/房间范围映射须在实现前确认。 | D | RBAC 配置 | 计划，未执行：全角色权限矩阵验证 | TODO | §十五 | 3 |
+| REQ-SEC-001 | 密码使用 BCrypt 存储和校验，不保存明文或可逆密码。 | D | AuthenticationService; ManagementService; LocalDemoSeed | 已执行：BCrypt(12) seed/登录/自助改密/管理员重置、UTF-8 边界和错误密码/旧凭据失效测试通过；响应无明文或哈希 | DONE | §十六、二十九 | 3 |
+| REQ-SEC-002 | JWT 必须验证且有 expiration；失效、过期或篡改凭证不能认证。 | D/全服务 | PlatformSecurity; JwtEncoder/Decoder; authVersion | 已执行：D 固定 HS256/issuer/audience、必需时间及严格 exp、签名/authVersion/DB 启用校验；正常/篡改/过期/边界失效测试通过 | DONE | §十六、二十九 | 3 |
+| REQ-SEC-003 | 权限必须后端校验，前端隐藏按钮不能作为权限控制；角色与个人数据范围隔离。 | 全服务/Web | AccessPolicy; D API 边界 | D DB 实时角色/权限和显式房间范围的学生/横向/纵向越权测试通过；未来模块/Web 继续补齐后端授权，不以隐藏按钮代替 | PARTIAL | §十五、二十九 | 3 起 |
+| REQ-SEC-004 | RBAC 保留附录 C 的角色和权限示例；角色到权限及组织/房间范围映射须在实现前确认。 | D | V3 七角色/14 权限参考目录; role/room-scope API | 七角色/14 权限目录、SYSTEM_ADMIN 全局与 ROOM_ADMIN 显式范围测试通过；具体映射/组织范围仍待人工 review | PARTIAL | §十五 | 3 |
 | REQ-SEC-005 | 生产只通过 HTTPS 暴露业务流量。 | 运维 | Nginx / 公网入口 | 计划，未执行：HTTP 暴露面与 HTTPS 访问检查 | TODO | §十六、二十九 | 13/14 |
-| REQ-SEC-006 | SQL 参数化，禁止把不可信输入拼接为 SQL。 | 全服务 | MyBatis 数据访问 | 计划，未执行：参数化实现审查与恶意参数测试 | TODO | §二十九 | 3 起 |
-| REQ-SEC-007 | CORS 使用明确白名单，避免任意来源访问。 | 全服务 | CORS 配置 | 计划，未执行：白名单及非白名单来源验证 | TODO | §二十九 | 1 配置; 3 起验证 |
-| REQ-SEC-008 | Git 不包含 token、密码或密钥；部署脚本不得硬编码凭据。 | 全局 | Git / 配置 / 脚本 | 计划，未执行：提交与配置敏感信息检查 | TODO | §二、二十九、三十五 | 0–15 |
+| REQ-SEC-006 | SQL 参数化，禁止把不可信输入拼接为 SQL。 | 全服务 | D MyBatis Mapper; seed 参数绑定 | 当前 D Mapper/seed 使用绑定参数，真实 HTTP/数据库校验测试通过；后续模块继续审查，不能以 D 覆盖全部未来 SQL | PARTIAL | §二十九 | 3 起 |
+| REQ-SEC-007 | CORS 使用明确白名单，避免任意来源访问。 | 全服务 | PlatformSecurity CORS origins | D 明确来源白名单与拒绝星号已配置；实际 Compose 本地允许来源返回 200、非信任来源 403；其他模块/生产跨源配置持续维护 | PARTIAL | §二十九 | 1 配置; 3 起验证 |
+| REQ-SEC-008 | Git 不包含 token、密码或密钥；部署脚本不得硬编码凭据。 | 全局 | 私有 .env; init-env; Compose 运行注入 | JWT/数据库/内部调用秘密从私有环境提供，测试仅隔离凭据；本次提交敏感值检查与后续部署持续验证 | PARTIAL | §二、二十九、三十五 | 0–15 |
 | REQ-SEC-009 | 生产不得保留默认密码，初始管理员凭据必须外部提供并明确运维流程。 | 运维/D | 生产用户初始化 | 计划，未执行：无默认凭据验证 | TODO | §二十九 | 13/14 |
 | REQ-SEC-010 | 数据库只在私网可达，不向公网开放。 | 数据库/运维 | RDS / 网络规则 | 计划，未执行：公网拒绝及应用私网连接验证 | TODO | §二十九 | 13/14 |
-| REQ-SEC-011 | 内部 API 不得公开，生产 Swagger 必须限制访问；内部服务认证机制与凭据轮换待确认。 | 全服务/运维 | /internal/v1 / Swagger | 计划，未执行：外部拒绝、合法服务调用和文档访问控制 | TODO | §二十九 | 1 设计; 8/14 验证 |
-| REQ-SEC-012 | 日志不得记录 password、JWT、refresh token、签到码明文或敏感个人信息。 | 全服务 | 服务日志 | 计划，未执行：成功/失败路径日志泄露检查 | TODO | §二十七 | 1 起 |
+| REQ-SEC-011 | 内部 API 不得公开，生产 Swagger 必须限制访问；内部服务认证机制与凭据轮换待确认。 | 全服务/运维 | D internal 安全链; Nginx 隐藏路由; 静态 OpenAPI | D 三调用方 opaque 身份与 M1-only 验码测试通过；实际网关 internal 返回 404，用户 JWT 不能替代服务身份；生产秘密轮换/文档策略仍留后续 | PARTIAL | §二十九 | 1 设计; 8/14 验证 |
+| REQ-SEC-012 | 日志不得记录 password、JWT、refresh token、签到码明文或敏感个人信息。 | 全服务 | RequestLoggingFilter; ApiExceptionHandler; 审计字段 | 实际 D Compose 成功/失败请求日志抽查未发现本地私有凭据或生成签到码；模板化路径/最小审计字段已实现，未来全服务与生产日志持续验证 | PARTIAL | §二十七 | 1 起 |
 
 ## 代码约束与可观测性
 
 | ID | Requirement | Module | API/Page | Test | Status | Source | Phase |
 |---|---|---|---|---|---|---|---|
 | REQ-ENG-001 | 不创建无意义抽象；简单 CRUD 不堆 Manager/Helper/Factory/Adapter；内部代码保持简洁。 | 全局 | 代码结构 | 计划，未执行：实现评审 | TODO | §二、十八 | 1–15 |
-| REQ-ENG-002 | 严格校验集中在 HTTP request、JWT、权限、DB constraint、外部 HTTP response、状态机转换和环境变量边界。 | 全服务 | 七类边界 | 计划，未执行：边界非法输入与约束验证 | TODO | §十八 | 1–15 |
+| REQ-ENG-002 | 严格校验集中在 HTTP request、JWT、权限、DB constraint、外部 HTTP response、状态机转换和环境变量边界。 | 全服务 | D HTTP/JWT/权限/DB/env 边界 | D 请求/JWT/权限/DB/env 集中边界的真实测试通过；外部 HTTP 响应与其他模块状态机随业务补齐 | PARTIAL | §十八 | 1–15 |
 | REQ-ENG-003 | 禁止每层重复 null check/重复校验、内部对象反复 Bean Validation、无意义 Optional。 | 全服务 | 内部调用链 | 计划，未执行：代码审查 | TODO | §二、十八 | 1–15 |
 | REQ-ENG-004 | 禁止所有方法 try/catch、catch Exception 后返回默认值、无意义 fallback、默认成功和无限重试。 | 全服务 | 异常处理 / HTTP client | 计划，未执行：故障注入与失败透明性验证 | TODO | §二、十八 | 1–15 |
-| REQ-ENG-005 | 避免大量无意义日志；最低记录 timestamp、level、service、requestId、userId、method、path、status、latencyMs。 | 全服务 | 请求日志 | 计划，未执行：九字段完整性及请求关联核验 | TODO | §十八、二十七 | 1–15 |
+| REQ-ENG-005 | 避免大量无意义日志；最低记录 timestamp、level、service、requestId、userId、method、path、status、latencyMs。 | 全服务 | D RequestLoggingFilter; Spring 日志前缀 | D 实际请求日志含时间/级别/服务与 requestId/userId/方法/路由模板/状态/耗时；未记录敏感正文，其他模块完整业务日志留后续 | PARTIAL | §十八、二十七 | 1–15 |
 | REQ-ENG-006 | 注释仅解释业务规则、架构原因、并发逻辑和跨模块契约，不生成大段教学式注释。 | 全局 | 代码注释 | 计划，未执行：代码审查 | TODO | §十九 | 1–15 |
 | REQ-ENG-007 | GET /actuator/info 返回 service、version、gitCommit、buildTime，值来自真实构建。 | 全服务 | GET /actuator/info | 已执行：build-info.properties 与四服务真实 info HTTP 核对 | DONE | §二十八 | 1 |
 | REQ-ENG-008 | AI 仅用于开发及最后可选 Agent，不成为核心业务真值来源，不决定权限、审批、预约、座位或工单状态。 | 全局 | AI 边界 | 计划，未执行：架构及调用路径审查 | TODO | §一、十九、三十七 | 0–15 |
@@ -203,12 +203,12 @@
 
 | ID | Requirement | Module | API/Page | Test | Status | Source | Phase |
 |---|---|---|---|---|---|---|---|
-| REQ-TEST-001 | 单元测试验证状态机、时间规则、权限、最大预约时间、取消规则和超时逻辑。 | 全局 | JUnit 5 / Vitest | 计划，未执行：六类行为测试实际运行 | TODO | §二、二十五 | 3–10 |
+| REQ-TEST-001 | 单元测试验证状态机、时间规则、权限、最大预约时间、取消规则和超时逻辑。 | 全局 | D Authentication/Management/CommonResourcesTest | D 身份权限、正整数参数和 Clock 日界真实测试已通过；预约时长执行、取消、超时和业务状态机留对应阶段 | PARTIAL | §二、二十五 | 3–10 |
 | REQ-TEST-002 | 不测试 getter/setter、框架本身、常量；禁止测试只断言常量或 mock 被测逻辑本身。 | 全局 | 测试代码 | 计划，未执行：测试有效性审查 | TODO | §二、二十五 | 1–15 |
-| REQ-TEST-003 | 集成测试使用 Testcontainers PostgreSQL，覆盖 Flyway 空库重放和 unique constraint。 | D/M1/M2/M3 | 各服务 RuntimeEndpointsTest; NonLocalDatabaseTest; DatabaseTestSupport | 已执行：真实 PostgreSQL/Flyway 空库、隔离及 seed 唯一键幂等；业务 unique constraint 测试留对应阶段 | PARTIAL | §二十五 | 2–10 |
+| REQ-TEST-003 | 集成测试使用 Testcontainers PostgreSQL，覆盖 Flyway 空库重放和 unique constraint。 | D/M1/M2/M3 | Testcontainers; DatabaseTestSupport; D V1–V3 | 真实 PostgreSQL 空库 V1–V3/账号隔离、日码唯一/并发、审计保护通过；M1 预约等业务 unique constraint 测试仍留后续 | PARTIAL | §二十五 | 2–10 |
 | REQ-TEST-004 | 集成测试覆盖并发预约、room_gate lock 和占用互斥，确认冲突不会生成双重预约。 | M1 | 并发集成测试 | 计划，未执行：多请求竞争及事务结果验证 | TODO | §二十五 | 4/10 |
 | REQ-TEST-005 | 集成测试通过真实 HTTP 覆盖 M2→M1、M3→M1 和 idempotency，不以生产 mock 替代。 | M2/M3/M1 | 跨服务集成测试 | 计划，未执行：成功、重复、冲突和失败结果 | TODO | §二十五 | 8/10 |
-| REQ-TEST-006 | API 测试覆盖 401、403、正常请求、409、非法参数和角色隔离。 | 全服务 | API 测试集 | 计划，未执行：状态码与数据权限断言 | TODO | §二十五 | 3–10 |
+| REQ-TEST-006 | API 测试覆盖 401、403、正常请求、409、非法参数和角色隔离。 | 全服务 | D API HTTP/PostgreSQL 测试集 | D 真实 HTTP/PostgreSQL 的 401/403/正常/409/非法参数/角色/房间隔离通过；其他模块继续补齐 | PARTIAL | §二十五 | 3–10 |
 | REQ-TEST-007 | Playwright E2E 覆盖学生登录 → 搜索 → 预约，以及签到。 | Web/M1/D | 学生页面 | 计划，未执行：真实后端 Playwright 报告 | TODO | §二十五 | 9/10 |
 | REQ-TEST-008 | Playwright E2E 覆盖整教室申请 → 审批 → M1 座位不可约。 | Web/M2/M1 | 申请/审批/座位页面 | 计划，未执行：真实跨模块 Playwright 报告 | TODO | §二十五 | 9/10 |
 | REQ-TEST-009 | Playwright E2E 覆盖报修 → 开始维修 → M1 下架，以及验收 → 座位恢复。 | Web/M3/M1 | 报修/维修/座位页面 | 计划，未执行：真实跨模块 Playwright 报告 | TODO | §二十五 | 9/10 |
@@ -253,10 +253,10 @@
 
 | ID | Requirement | Module | API/Page | Test | Status | Source | Phase |
 |---|---|---|---|---|---|---|---|
-| REQ-ETH-001 | 持续维护 docs/ethics/ETHICS_LOG.md，记录实际问题与决策，不在最后补写空泛文章。 | 治理 | docs/ethics/ETHICS_LOG.md | 计划，未执行：真实问题、决策与时间记录 | TODO | §三十八 | 3 起持续 |
+| REQ-ETH-001 | 持续维护 docs/ethics/ETHICS_LOG.md，记录实际问题与决策，不在最后补写空泛文章。 | 治理 | docs/ethics/ETHICS_LOG.md | 已随 Phase 1–3 记录真实身份/范围/数据最小化/秘密与保留未决项；持续事项，不以文档存在标全项目完成 | PARTIAL | §三十八 | 3 起持续 |
 | REQ-ETH-002 | 记录并决定违约记录保存周期，实施前明确保留、删除和可见范围。 | M1/D | 违约数据生命周期 | 计划，未执行：保留策略与实现对照 | TODO | §三十八 | 3–5 起持续 |
-| REQ-ETH-003 | 记录管理员权限边界及个人信息最小化问题。 | D/全服务 | RBAC / 数据字段 | 计划，未执行：权限和必要数据范围审查 | TODO | §三十八 | 3 起持续 |
-| REQ-ETH-004 | 记录日志数据相关风险及处置，遵守敏感字段禁止记录要求。 | 全服务 | 日志政策 | 计划，未执行：实际日志抽查及决策记录 | TODO | §三十八 | 1 起持续 |
+| REQ-ETH-003 | 记录管理员权限边界及个人信息最小化问题。 | D/全服务 | D 角色/显式 room scope; ETHICS_LOG | 记录系统管理员/房间管理员边界、五用户 seed 和字段最小化；方案待审，部门审批与生产个人信息仍留后续 | PARTIAL | §三十八 | 3 起持续 |
+| REQ-ETH-004 | 记录日志数据相关风险及处置，遵守敏感字段禁止记录要求。 | 全服务 | D 请求/异常/审计日志; ETHICS_LOG | 已记录日志最小化与审计保留风险；本轮实际 D 日志抽查无私有凭据/生成码，未来模块/部署继续处置和审阅 | PARTIAL | §三十八 | 1 起持续 |
 | REQ-ETH-005 | 记录 Agent 越权风险与基于 API 权限的约束措施。 | Optional | Agent / ETHICS_LOG | 计划，未执行：越权测试与风险处置 | TODO | §三十八 | 15 可选 |
 | REQ-ETH-006 | 记录自动撤销风险，包括时间边界、错误处置和受影响用户的处理。 | M1/M2 | NO_SHOW / 审批超时 | 计划，未执行：边界案例与伦理决策记录 | TODO | §三十八 | 5/6 起持续 |
 | REQ-ETH-007 | 记录维修下架误伤风险及对既有预约的处理决策。 | M3/M1 | 房间维修占用 | 计划，未执行：既有预约冲突案例与决策 | TODO | §三十八 | 7/8 起持续 |
@@ -267,7 +267,7 @@
 |---|---|---|---|---|---|---|---|
 | REQ-PH-001 | 仅获下一阶段确认后创建 4 Spring Boot services、1 Vue app、Dockerfile、Compose、Nginx；每服务有 health/info，docker compose up -d 后全部 healthy。 | 全局 | 工程骨架 | 已执行：后端 16 tests、前端 6 tests/build、七容器/HTTP/浏览器验收 | DONE | Phase 1 | 1 |
 | REQ-PH-002 | 建四 schema、独立账号、Flyway、最小 seed；开发环境 docker compose down -v 后 up -d，全新数据库自动 migration。 | 数据库 | 四服务数据库工程; deploy/postgres; LocalDemoSeed | 已执行：23 项 JUnit/Testcontainers；Compose down -v/up -d 空卷自动迁移、七容器健康、数据库隔离检查；保留卷重启计数/密码哈希不变，见 Phase 2 验证记录 | DONE | Phase 2 | 2 |
-| REQ-PH-003 | 实现 login、RBAC、user、role、permission、building、room、seat、settings、checkin code、audit；管理员能维护空间，学生无管理权限，后端 RBAC 生效。 | D | D 公共层 | 计划，未执行：真实管理与权限验收 | TODO | Phase 3 | 3 |
+| REQ-PH-003 | 实现 login、RBAC、user、role、permission、building、room、seat、settings、checkin code、audit；管理员能维护空间，学生无管理权限，后端 RBAC 生效。 | D | D 32 操作; V2/V3; OpenAPI/运行脚本 | 已执行：后端 49 项/前端 6 项及 lint/类型检查/build 通过；保留原卷 V1→V3、七容器 healthy、真实五用户登录/管理员空间与参数/范围内房管/日码/审计/学生拒绝/内部隐藏及恢复检查全部通过 | DONE | Phase 3 | 3 |
 | REQ-PH-004 | 实现房间/座位/可用性查询、创建、取消、历史、再预约、room_gate、seat_occupancy；验收不能重复预约、默认 4 小时、插座过滤、历史再预约。 | M1 | M1 基础预约 | 计划，未执行：四项业务验收 | TODO | Phase 4 | 4 |
 | REQ-PH-005 | 实现签到、T−15/T+10 提醒、T+15 NO_SHOW、违约和占用释放，使用可注入 Clock。 | M1/D | M1 签到违约 | 计划，未执行：真实签到及全部时间节点验证 | TODO | Phase 5 | 5 |
 | REQ-PH-006 | 实现 submit、approval、approve、reject、cancel、timeout；单元测试可 mock M1，生产必须真实 HTTP client。 | M2 | M2 | 计划，未执行：状态机及 HTTP client 验收 | TODO | Phase 6 | 6 |
@@ -284,8 +284,8 @@
 ## 基线统计与更新规则
 
 - 需求总数：186。
-- 当前状态：DONE 18；TODO 158；PARTIAL 10；BLOCKED 0。
+- 当前状态：DONE 28；TODO 130；PARTIAL 28；BLOCKED 0。
 - 分类计数：REQ-P0: 8, REQ-GOV: 12, REQ-ARCH: 12, REQ-DATA: 12, REQ-D: 8, REQ-M1: 17, REQ-M2: 10, REQ-M3: 12, REQ-API: 8, REQ-SEC: 12, REQ-ENG: 9, REQ-UI: 9, REQ-TEST: 12, REQ-OPS: 16, REQ-AGENT: 7, REQ-ETH: 7, REQ-PH: 15。
 - API/Page 和 Test 的计划内容须在对应阶段替换/补充为真实契约、代码/测试路径和执行证据；保留源要求与稳定 ID。
 - 标记 DONE 前，检查源 §三十九 DoD 和本阶段适用范围，更新实际验收记录；不得把计划测试名称、文档审阅或工具退出码冒充业务测试通过。
-- Phase 0/1 保留为历史基线；当前仅 Phase 2 获授权，Phase 3–15 继续等待确认。未建的业务表继续保留原需求和 TODO，不用数据库基础完成替代业务验收。
+- Phase 0–2 保留为历史基线；当前仅 Phase 3 获授权，Phase 4–15 继续等待确认。未建的业务表、完整 Web、CI/CD 继续保留原需求和 TODO，不以 D 实现替代后续验收。

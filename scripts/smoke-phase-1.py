@@ -26,6 +26,7 @@ def main():
     parser.add_argument("--url", default="http://127.0.0.1:18080")
     parser.add_argument("--expected-commit", required=True)
     parser.add_argument("--wait", type=int, default=180)
+    parser.add_argument("--platform-api", action="store_true", help="Phase 3 opens authenticated platform APIs")
     args = parser.parse_args()
 
     expected = {"postgres", "platform-service", "reservation-service", "classroom-service",
@@ -70,10 +71,11 @@ def main():
             assert request(args.url, f"/status/{name}/{endpoint}", "POST")[0] == 405
         print(f"PASS: {name} health/info, real metadata and read-only gateway")
 
-    for path in ("/actuator", "/actuator/env", "/internal/v1/room-blocks", "/api/v1/users",
+    for path in ("/actuator", "/actuator/env", "/internal/v1/room-blocks",
                  "/status/platform/env", "/status/unknown/info", "/status/platform/info/extra"):
         assert request(args.url, path)[0] == 404, path
     print("PASS: internal, unimplemented and non-whitelisted management paths hidden")
+    assert request(args.url, "/api/v1/users")[0] == (401 if args.platform_api else 404)
 
     status, body, _ = request(args.url, "/")
     assert status == 200 and '<html lang="zh-CN">' in body.decode(), (status, body[:200])

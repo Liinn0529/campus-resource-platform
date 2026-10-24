@@ -1,6 +1,6 @@
 # 数据所有权与一致性边界
 
-状态：Phase 2 数据库实现方案，待草稿 PR 人工 Review。四 schema、八个数据库账号、四服务 Flyway V1 及 D 的八张基础表已有真实 PostgreSQL/Testcontainers 验证；这不代表完整业务模型或后续阶段已完成，也不代表 schema 已获人工批准。
+状态：Phase 3 D 公共层实现方案，待草稿 PR 人工 Review。Phase 2 的四 schema、八账号和 V1 基线保留；D 新增 V2/V3、12 张基础业务表和 32 个公开/内部操作，完整后端 49 项真实测试、Compose 原卷升级和实际公共层运行验收已通过，Phase 3 完成后等待 Phase 4 确认。最终干净提交重建的 SHA/时间另由交付报告记录，不预填结果。具体 API 见[平台契约](../api/platform.md)；代码或测试存在不表示阶段验收、schema 人工批准或后续业务已完成。
 
 依据：[原始执行要求](../requirements/CODEX_EXECUTION_PROMPT.md)第 5–16、24、27、29 节。配套：[架构](ARCHITECTURE.md)、[ADR-001](../adr/ADR-001-service-boundary.md)、[需求](../requirements/REQUIREMENTS.md)、[追踪表](../requirements/TRACEABILITY.md)。
 
@@ -24,30 +24,34 @@ Phase 2 由 [PostgreSQL 空库引导脚本](../../deploy/postgres/010-service-da
 | `classroom` | `classroom_migrator` | `classroom_app` |
 | `maintenance` | `maintenance_migrator` | `maintenance_app` |
 
-引导脚本撤销数据库及 `public` schema 的 PUBLIC 默认权限；各角色只获得该库 CONNECT，应用只获得自身 schema USAGE。迁移账号以 owner 身份在本 schema 执行 DDL，其新表默认向本服务 app 授予 SELECT/INSERT/UPDATE/DELETE，新序列授予 USAGE/SELECT。app 无 schema CREATE、DDL 或切换 migrator 的权限。每份 V1 显式撤销 app 对自身 `flyway_schema_history` 的全部权限，包括读取和修改；该表只由迁移账号维护。各角色 search_path 固定为自身 schema 与 `pg_catalog`，各服务连接也指定自身 schema。
+引导脚本撤销数据库及 `public` schema 的 PUBLIC 默认权限；各角色只获得该库 CONNECT，应用只获得自身 schema USAGE。迁移账号以 owner 身份在本 schema 执行 DDL，其新表默认向本服务 app 授予 SELECT/INSERT/UPDATE/DELETE，新序列授予 USAGE/SELECT。app 无 schema CREATE、DDL 或切换 migrator 的权限。每份 V1 显式撤销 app 对自身 `flyway_schema_history` 的全部权限，包括读取和修改；该表只由迁移账号维护。Phase 3 V2 额外撤销 platform_app 对 audit_log 的 UPDATE/DELETE/TRUNCATE，保留新增和授权查询。各角色 search_path 固定为自身 schema 与 `pg_catalog`，各服务连接也指定自身 schema。
 
-只有同一服务拥有的数据实体之间可以在后续模型中设计数据库外键。跨服务的用户、房间、座位及业务来源标识均为逻辑 ID，不建立跨 schema 外键。源服务负责其数据真实性，使用方负责按契约校验与处理失效引用；删除限制、快照及历史保留策略尚未确定。
+只有同一服务拥有的数据实体之间可以设计数据库外键。跨服务的用户、房间、座位及业务来源标识均为逻辑 ID，不建立跨 schema 外键。源服务负责其数据真实性，使用方负责按契约校验与处理失效引用；删除限制、快照及历史保留策略尚未确定。
 
 ## 2. D：身份与空间主数据
 
-源指定 RBAC 表为 `user`、`role`、`permission`、`user_role`、`role_permission`。D 拥有用户密码哈希、角色权限、楼宇、房间（教室/自习室）、座位主数据和系统参数。Phase 2 的 [V1 迁移](../../services/platform-service/src/main/resources/db/migration/V1__platform_schema.sql) 只创建最小 seed 必需的以下八表，作为待人工审阅的 schema 方案：
+源指定 RBAC 表为 `user`、`role`、`permission`、`user_role`、`role_permission`。D 拥有用户密码哈希、角色权限、楼宇、房间（教室/自习室）、座位主数据和系统参数。Phase 2 的 [V1 迁移](../../services/platform-service/src/main/resources/db/migration/V1__platform_schema.sql) 创建以下八表，原文件保持不变；Phase 3 用[新 V2](../../services/platform-service/src/main/resources/db/migration/V2__platform_common_services.sql)扩展，再以[独立 V3 参考目录](../../services/platform-service/src/main/resources/db/migration/V3__platform_reference_permissions.sql)加载身份权限/参数定义：
 
 | 当前表 | 已实现的数据库边界 |
 |---|---|
-| `platform."user"` | identity 主键、唯一用户名、非空 BCrypt 格式密码哈希、演示显示名称、启用标记、创建时间 |
-| `platform.role` | identity 主键、唯一角色 code、名称；七类角色字典 |
-| `platform.permission` | identity 主键、唯一权限 code、名称；Phase 2 不填充权限矩阵 |
+| `platform."user"` | identity 主键、唯一用户名、非空 BCrypt 格式密码哈希、显示名称、启用标记、创建时间；V2 增加非负 auth_version，用于改密/启用状态变更后失效旧 JWT |
+| `platform.role` | identity 主键、唯一角色 code、名称；七类固定角色字典；V3 在所有环境建立 |
+| `platform.permission` | identity 主键、唯一权限 code、名称；Phase 3 V3 建立 14 项权限参考定义 |
 | `platform.user_role` | `(user_id, role_id)` 复合主键；仅引用本 schema 的用户和角色 |
-| `platform.role_permission` | `(role_id, permission_id)` 复合主键；仅引用本 schema 的角色和权限；Phase 2 无分配数据 |
+| `platform.role_permission` | `(role_id, permission_id)` 复合主键；仅引用本 schema 的角色和权限；Phase 3 初始 35 条参考关系，后端按当前 DB 授权 |
 | `platform.building` | identity 主键、唯一楼宇 code、名称 |
 | `platform.room` | identity 主键、building 外键、楼内 code 唯一、`STUDY_ROOM/CLASSROOM` 类型约束、启用标记 |
 | `platform.seat` | identity 主键、room 外键、房内 code 唯一、插座标记、启用标记；不设置业务占用状态 |
+| `platform.user_room_scope` | V2 `(user_id,room_id)` 复合主键，均为 D 外键；管理接口只向 ROOM_ADMIN 分配，无隐式范围 |
+| `platform.system_setting` | V2 key 主键、正整数 value；V3 默认 max_reservation_hours=4 |
+| `platform.room_checkin_code` | V2 `(room_id,date)` 主键、D room 外键、8 位安全字符约束、created_at；code 不要求全局唯一 |
+| `platform.audit_log` | V2 identity 主键、同 D actor 用户引用、来源/动作/目标 ID、UUID request_id、时间；app 只新增/查询，不可更新或删除 |
 
-基础实体 id 由数据库 identity 生成，关联通过同 schema 外键约束；seed 不指定 id、不重置序列。登录、JWT、后端 RBAC、权限矩阵、主数据管理端点均留 Phase 3，不能以这些表存在替代相应业务验收。
+基础实体 id 由数据库 identity 生成，关联通过同 schema 外键约束；local seed 不指定 id、不重置序列。Phase 3 的真实 MyBatis/HTTP 实现包括登录、JWT、后端 RBAC、用户/角色管理及空间维护，后端真实测试与 Compose 原库升级/实际 API 验收已通过；具体行为证据来自测试和运行检查，不能以表/端点存在替代验收。SYSTEM_ADMIN 管理全局 D，ROOM_ADMIN 只能维护显式范围内房间/座位和对应签到码，默认无范围。角色权限与范围从当前 DB 读取；全局管理还要求 SYSTEM_ADMIN 身份，移除/停用最后一名启用系统管理员被拒绝。
 
-D 拥有未来的 `room_checkin_code`，字段为 `room_id`、`date`、`code`、`created_at`；本阶段尚未建表，随 Phase 3 签到码契约确定后迁移。要求每天每房间一个 6–8 位随机字符签到码，并以数据库唯一约束保证要求；可生成 QR Code。业务日期的时区以及 `code` 自身的唯一范围需 Review，不能从示例推导全局唯一策略。签到码明文不得进入日志。系统参数、审计及可能的通知持久化表也留对应业务阶段设计。
+D 已在 V2 建立 `room_checkin_code(room_id,date,code,created_at)`。当前草案以注入 Clock 和显式 ZoneId 计算今日，local 使用 Asia/Shanghai，生成 8 位 SecureRandom 字符，并以 (room_id,date) 主键及 room 行锁保证每日/并发 ensure 同条且只记一次创建审计。GET 只读已有今日记录；POST ensure 首次/重复均为 200，不提供当日轮换或全局 code 唯一。SYSTEM_ADMIN 或已授权房间的 ROOM_ADMIN 可取码，学生不可读码；停用房间不能生成或校验有效码。时区/码规则为待人工 review 的具体方案，QR 载荷、实际预约签到窗口和补签到仍留 Phase 5；明文码不写入日志或审计。
 
-M1 通过 D 的服务契约校验签到码对应房间，并结合 M1 预约完成签到；D 的“发码记录”不等于 M1 的“预约签到结果”。D 的系统参数包含最大预约时长，默认值为 4 小时；参数变更的生效口径和读取策略仍需确认。
+D 现提供内部 room/seat 主数据、settings 读取和 checkin-codes/verify 共四个操作；三调用方使用各自独立 opaque 凭据，只有 reservation-service 可验码，用户 JWT 不能冒充内部身份，Nginx 不公开 internal。后续 M1 必须真实经 HTTP 获取这些数据并结合自己的预约完成签到；当前尚无实际 M1 调用或签到记录。D 的最大预约时长初始为 4，允许存储正整数；对既有预约的生效口径和 M1 使用方式仍需 Phase 4 确认。
 
 M2/M3 对房间不可用的影响不能通过修改 D 的座位主数据代替占用记录。D 对房间/座位的维护与占用的关系，尤其是有未来预约时停用或删除资源的处理，必须在实现前明确。
 
@@ -119,22 +123,24 @@ M2/M3 只能通过 `POST /internal/v1/room-blocks` 和 `DELETE /internal/v1/room
 | Web | 各模块公开业务数据 | 对应后端服务 | 公开 API，无数据库访问权 |
 | 可选 Agent | 源指定业务操作 | 对应后端服务 | 公开 API，继承真实用户权限，不直连数据库 |
 
-本矩阵表示责任边界，不预先承诺 HTTP 接口的具体方法/路径、缓存策略或每次调用次数。确需增加跨服务契约时，按公共契约与跨模块变更规则人工 Review。
+本矩阵保留目标责任边界。Phase 3 已具体实现的只有 D 的四个内部读取/验码操作，见[OpenAPI](../../contracts/openapi/platform.v1.json)，其他跨服务业务调用、远程身份/审计写入和通知未实现。后续新增方法/路径、缓存或调用行为仍须按公共契约和跨模块规则人工 Review。
 
 ## 6. 时间、迁移与保留策略
 
 M1 按整点小时校验预约，默认连续最多 4 小时，创建前检查所有来源占用；时间逻辑使用可注入 `Clock`。区间是否采用左闭右开、输入时间标准化、业务时区、历史展示、预约取消和签到允许时间窗仍待确认。`end_at=null` 的维修占用不能被默认为零时长或自动失效。
 
-每服务 V1 已位于自身 `src/main/resources/db/migration/`，应用启动时由 Flyway 使用专属 migrator 执行；`create-schemas=false`、`clean-disabled=true`，schema 和角色由空库引导创建，禁止应用自行扩权。Flyway 迁移只向前，已执行/发布版本不可修改，修复必须创建新迁移。真实 Testcontainers 空库已自动完成各服务 V1 并通过 Flyway 校验；开发 Compose 也已实际完成本项目 down -v/up -d 空卷迁移及保留卷重启验证，见 [Phase 2 验证记录](../review/phase-2-validation.md)，不混称同一次验证。
+各迁移位于自身 `src/main/resources/db/migration/`；公共层当前 V1–V3，M1/M2/M3 仍为 V1，应用启动时由 Flyway 使用专属 migrator 执行；`create-schemas=false`、`clean-disabled=true`，schema 和角色由空库引导创建，禁止应用自行扩权。Flyway 迁移只向前，已执行/发布版本不可修改，修复必须创建新迁移。真实 Testcontainers 空库已自动完成各服务 V1 并通过 Flyway 校验；开发 Compose 也已实际完成本项目 down -v/up -d 空卷迁移及保留卷重启验证，见 [Phase 2 验证记录](../review/phase-2-validation.md)，不混称同一次验证。
 
-结构与 seed 分离。D 的 `db/seed/local/*.sql` 仅由 `local` profile 的 `LocalDemoSeed` 在事务中执行：七个角色字典、五个演示用户及五条用户角色关系、两栋楼、四个房间、四十个座位。五用户分别是 `demo_admin:SYSTEM_ADMIN`、`demo_student_01:STUDENT`、`demo_student_02:STUDENT`、`demo_room_admin:ROOM_ADMIN`、`demo_property_staff:PROPERTY_STAFF`，没有新增其他演示用户或预约、审批、工单。权限与角色权限表保持空，不能假设额外审批人已经存在。
+结构与演示 seed 分离。V2 只有结构/权限变更；V3 是全环境的七角色、14 权限、初始 35 条角色权限关系和默认参数参考数据，不创建演示用户/空间。D 的 `db/seed/local/*.sql` 仅由 `local` profile 的 `LocalDemoSeed` 在事务中执行，保留角色字典的幂等写入、五个演示用户及五条用户角色关系、两栋楼、四个房间、四十个座位。五用户分别是 `demo_admin:SYSTEM_ADMIN`、`demo_student_01:STUDENT`、`demo_student_02:STUDENT`、`demo_room_admin:ROOM_ADMIN`、`demo_property_staff:PROPERTY_STAFF`，没有新增其他演示用户或预约、审批、工单。角色权限参考目录不增加用户或额外审批人；demo_room_admin 初始没有房间 scope。通过管理员 API 创建的合法业务/测试用户不同于扩充 local seed。
 
-本地演示密码从私有环境提供，校验为非空白且 24–72 UTF-8 字节，生成五个独立 BCrypt(12) 哈希后参数绑定。各 seed 依据自然唯一键 `ON CONFLICT DO NOTHING`，关系 id 通过本 schema JOIN 获取，座位只匹配四个指定演示房间。重复执行不会扩充数量、覆盖已有字段或重置已有密码。非 `local` profile 已验证不需要演示密码、不执行 seed、八表全部为空；生产凭据流程仍属于后续运维阶段。
+本地演示密码从私有环境提供，校验为非空白且 24–72 UTF-8 字节，生成五个独立 BCrypt(12) 哈希后参数绑定。各 seed 依据自然唯一键 `ON CONFLICT DO NOTHING`，关系 id 通过本 schema JOIN 获取，座位只匹配四个指定演示房间。重复执行不会扩充数量、覆盖已有字段或重置已有密码。Phase 3 的真实 non-local 测试已验证：保留 V3 参考目录和参数，不创建演示用户/空间/码/审计，也不要求演示密码。所有 profile 均要求外部 JWT/独立内部凭据和显式业务时区；无默认生产管理员，初始化及秘密注入/轮换流程仍须后续运维审阅。
 
 违约、操作审计、业务事件、通知、个人信息的保存周期未指定；保留、删除、脱敏、停用资源与历史可追溯的政策应持续记录于工程伦理文档。不得预先填入任意保留天数，亦不得将日志当作业务真值来源。
 
 ## 7. 当前验证与后续边界
 
-Phase 0 只检查文档覆盖与一致性。Phase 2 已执行 `scripts/test-backend.sh`，JUnit 共 23 项通过、失败 0、错误 0、跳过 0：D 的 7 项 local 测试和 1 项 non-local 测试，另三服务各 5 项。测试用真实 Testcontainers PostgreSQL 及实际引导脚本，覆盖四服务 V1、各 app 在本 schema 的 DML、app 与 migrator 对其他 schema 实际表的读写拒绝、app DDL/角色切换/迁移历史读取与修改拒绝、精确 seed、BCrypt 密码匹配、重放不重置密码、非 local 无 seed，以及各服务 health/info 和路径限制。公共数据库断言位于 [DatabaseTestSupport](../../tests/java/cn/campus/resource/testing/DatabaseTestSupport.java)，服务测试位于各模块 `src/test/java/`。
+Phase 0 只检查文档覆盖与一致性。以下保留历史：Phase 2 已执行 `scripts/test-backend.sh`，JUnit 共 23 项通过、失败 0、错误 0、跳过 0：D 的 7 项 local 测试和 1 项 non-local 测试，另三服务各 5 项。测试用真实 Testcontainers PostgreSQL 及实际引导脚本，覆盖四服务 V1、各 app 在本 schema 的 DML、app 与 migrator 对其他 schema 实际表的读写拒绝、app DDL/角色切换/迁移历史读取与修改拒绝、精确 seed、BCrypt 密码匹配、重放不重置密码、非 local 无 seed，以及各服务 health/info 和路径限制。公共数据库断言位于 [DatabaseTestSupport](../../tests/java/cn/campus/resource/testing/DatabaseTestSupport.java)，服务测试位于各模块 `src/test/java/`。
 
-后续仍必须以真实业务行为验证：预约/占用等业务唯一约束；房间锁阻止并发重复预约；M2/M3 经 HTTP 改变 M1 占用；重试遵守错误类型和次数限制；重复请求与内容冲突处理正确；释放与恢复不误删其他来源占用；后端 RBAC 和完整敏感日志规则生效。这些业务模型、端点、测试及 CI/CD 均未因 Phase 2 数据库基础完成而标为 DONE。
+Phase 3 当前已有 32 操作及真实 HTTP/PostgreSQL 测试代码：登录/改密/重置、JWT 到期/签名/issuer/audience/authVersion、即时撤权、用户/角色/范围管理、最后启用系统管理员并发保护、空间维护、参数、上海日界/并发码及内部身份。完整套件已执行，Surefire 核对共 49 项通过、0 失败、0 错误、0 跳过：D 身份 12 项、空间/公共服务 7 项、用户/角色/审计 7 项、运行/seed 7 项、non-local 1 项，另三服务各 5 项；前端 6 项及 lint/类型检查/构建也通过。通过代码测试的首个功能分项已提交 c5fd067012ea40c8a9163261e0bb9b68f4c71a19。实际 Compose 保留已有 Phase 2 数据卷从 V1 升至 V3，原演示实体与五用户密码指纹不变，五镜像构建、七容器健康、公开/内部边界和真实公共层 smoke 已通过。首次联调为 c5fd067012ea40c8a9163261e0bb9b68f4c71a19-dirty / 2026-10-24T13:03:02Z；本轮没有执行 down -v，不将 Phase 2 历史重放冒充本次升级。最终干净提交重建元数据由仓库外交付报告记录，过程见[Phase 3 记录](../plans/phase-3.md)。
+
+后续仍须以真实业务行为验证预约/占用唯一约束、M1 房间锁、M2/M3 经 HTTP 改变占用、错误分类/重试、重复/冲突请求及释放恢复。当前 D 的 RBAC/码/参数不代表这些业务、完整 Web、全服务日志、CI/CD 或云部署完成。

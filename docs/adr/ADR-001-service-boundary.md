@@ -2,11 +2,11 @@
 
 - 状态：**Proposed / 待人工 Review**
 - 日期：2026-10-20
-- 阶段：Phase 0 起草；Phase 2 补充实施范围
+- 阶段：Phase 0 起草；Phase 2/3 补充实施范围
 - 决策来源：[CODEX_EXECUTION_PROMPT.md](../requirements/CODEX_EXECUTION_PROMPT.md)第 4–10、16–18、24、29–37 节
 - 关联：[ARCHITECTURE.md](../architecture/ARCHITECTURE.md)、[DATA_OWNERSHIP.md](../architecture/DATA_OWNERSHIP.md)、[REQUIREMENTS.md](../requirements/REQUIREMENTS.md)、[TRACEABILITY.md](../requirements/TRACEABILITY.md)
 
-本 ADR 记录用户源文件已指定的架构约束及其影响。Proposed 表示尚待人工 Review，不表示可以自由替换源要求，也不表示人类已批准该文档或任何数据库/公共契约变更。Phase 0 起草时尚无服务或数据库；Phase 1 已交付工程骨架，当前 Phase 2 已实现四 schema、八个独立应用/迁移账号、四服务 Flyway V1、D 的八张基础表及 local-only 最小 seed。具体范围见 [DATA_OWNERSHIP.md](../architecture/DATA_OWNERSHIP.md)，其余业务模型仍按后续阶段实施；本阶段 Compose 验收另见 [Phase 2 记录](../plans/phase-2.md)。
+本 ADR 记录用户源文件已指定的架构约束及其影响。Proposed 表示尚待人工 Review，不表示可以自由替换源要求，也不表示人类已批准该文档或任何数据库/公共契约变更。Phase 0 起草时尚无服务或数据库；Phase 1/2 已交付骨架和隔离数据库。Phase 3 在 D 追加 V2/V3、32 个公开/内部操作和身份/角色/权限/空间/参数/日码/审计，保留七角色、五个 local seed 用户。后端 49 项、前端 6 项及保留原卷升级/七容器/实际 D API 验收通过。具体数据边界见 [DATA_OWNERSHIP.md](../architecture/DATA_OWNERSHIP.md)，实际证据见 [Phase 3 记录](../plans/phase-3.md)；M1/M2/M3 业务、通知投递、完整 Web 和生产部署仍属后续阶段。
 
 ## 背景
 
@@ -55,8 +55,8 @@
 | 重试语义 | “最多 3 次”包含首次调用与否、调度间隔、持久化恢复、4xx 的最终处理及人工恢复入口 |
 | 资源生命周期 | D 资源创建/停用/删除与 M1 `room_gate`、已存在预约和占用之间的协调 |
 | 时间与业务政策 | 时区、区间端点、签到/取消窗口、NO_SHOW 与取消的状态表达、审批/维修超时阈值 |
-| 安全和数据最小化 | 内部服务认证、JWT 签名校验、角色数据范围、通知/审计失败处理、保留和删除周期 |
+| 安全和数据最小化 | Phase 3 的 D JWT/独立内部凭据/房间范围已有具体待审方案；其他模块接入、部门范围、通知/跨服务审计失败和保留/删除周期仍待明确 |
 
-Phase 0 的历史验收为文档存在、需求可追踪、边界有文字说明、未提前实现业务；Phase 1 已有运行端点和容器验收记录。Phase 2 使用真实 PostgreSQL/Testcontainers 验证迁移、schema 权限隔离、最小 seed 及幂等，结果单独记录。真实业务锁与唯一约束、HTTP 幂等及错误分类、M2/M3 到 M1 的业务 E2E 和生产部署仍须后续验证，不能从基础数据库测试推导业务完成。
+Phase 0 的历史验收为文档存在、需求可追踪、边界有文字说明、未提前实现业务；Phase 1 已有运行端点和容器验收记录。Phase 2 使用真实 PostgreSQL/Testcontainers 验证迁移、schema 权限隔离、最小 seed 及幂等。Phase 3 的 49 项后端测试和实际 Compose/HTTP 验收覆盖 D 身份权限、范围、日码及审计；它不替代 M1 房间锁/占用唯一约束、M2/M3 到 M1 的幂等业务 E2E 或生产部署验证。
 
-人工 Review 通过后方可记录 ADR 接受状态；当前 Phase 2 完成后须停止，等待用户明确确认再进入 Phase 3。文档的 Proposed 状态不能被阶段执行授权、测试通过、Git 提交或上传仓库自动替代。
+人工 Review 通过后方可记录 ADR 接受状态；本轮 Phase 3 完成后须停止，等待用户明确确认再进入 Phase 4。文档的 Proposed 状态不能被阶段执行授权、测试通过、Git 提交或上传仓库自动替代。

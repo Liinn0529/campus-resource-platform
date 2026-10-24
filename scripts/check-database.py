@@ -34,6 +34,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--snapshot", type=Path, help="Write nonsensitive counts and password fingerprint")
     parser.add_argument("--compare", type=Path, help="Compare with a snapshot from before a persistent restart")
+    parser.add_argument("--phase3", action="store_true", help="Check platform V3, reference permissions and append-only audit")
     args = parser.parse_args()
 
     expected_roles = sorted(schema + suffix for schema in SCHEMAS for suffix in ("_app", "_migrator"))
@@ -44,10 +45,13 @@ def main():
     assert query("SELECT count(*) FROM pg_auth_members WHERE member IN (SELECT oid FROM pg_roles "
                  "WHERE rolname ~ '^(platform|reservation|classroom|maintenance)_(app|migrator)$')") == "0"
 
+    versions = {schema: (["1", "2", "3"] if args.phase3 and schema == "platform" else ["1"])
+                for schema in SCHEMAS}
     for schema in SCHEMAS:
         assert query("SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname='" + schema + "'") == schema + "_migrator"
         assert query("SELECT version || '|' || success FROM " + schema
-                     + ".flyway_schema_history WHERE version IS NOT NULL") == "1|true"
+                     + ".flyway_schema_history WHERE version IS NOT NULL ORDER BY installed_rank").splitlines() == [
+                         version + "|true" for version in versions[schema]], (schema, "Unexpected migration history")
         for migrator in (False, True):
             role = schema + ("_migrator" if migrator else "_app")
             assert query("SELECT current_user || '|' || current_schema()", schema, migrator) == role + "|" + schema
@@ -62,10 +66,20 @@ def main():
         query("SELECT * FROM " + schema + ".flyway_schema_history", schema, denied=True)
         query("UPDATE " + schema + ".flyway_schema_history SET description=description WHERE FALSE",
               schema, denied=True)
-        print("PASS:", schema, "migration v1, TCP credentials, schema isolation, app DDL/history restrictions")
+        print("PASS:", schema, "migration versions " + ",".join(versions[schema]),
+              "TCP credentials, schema isolation, app DDL/history restrictions")
+
+    if args.phase3:
+        query("UPDATE platform.audit_log SET action=action WHERE FALSE", "platform", denied=True)
+        query("DELETE FROM platform.audit_log WHERE FALSE", "platform", denied=True)
+        # Roll back even if a regression unexpectedly grants TRUNCATE, so verification cannot erase audit.
+        query("BEGIN; TRUNCATE TABLE platform.audit_log; ROLLBACK", "platform", denied=True)
+        print("PASS: platform app cannot update, delete or truncate audit history")
 
     expected = {"user": 5, "role": 7, "permission": 0, "user_role": 5,
                 "role_permission": 0, "building": 2, "room": 4, "seat": 40}
+    if args.phase3:
+        expected.update(permission=14, role_permission=35, user_room_scope=0)
     counts = {table: int(query('SELECT count(*) FROM platform."' + table + '"', "platform"))
               for table in expected}
     assert counts == expected, counts
@@ -73,6 +87,9 @@ def main():
     fingerprint = hashlib.sha256(passwords.encode()).hexdigest()
     evidence = {"counts": counts, "passwordFingerprint": fingerprint,
                 "schemas": list(SCHEMAS), "version": "1"}
+    if args.phase3:
+        evidence.pop("version")
+        evidence["versions"] = versions
     if args.compare:
         assert json.loads(args.compare.read_text()) == evidence, "Data or existing passwords changed on restart"
         print("PASS: restart retained exact counts, migration versions and existing password hashes")
