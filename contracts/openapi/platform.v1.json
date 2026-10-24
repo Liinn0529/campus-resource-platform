@@ -1,0 +1,3547 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Campus Resource Platform — implemented D APIs",
+    "version": "0.1.0-phase3",
+    "description": "Static contract for Phase 3 source only. Public user JWT and private opaque service credentials are different trust domains. API success is {data,requestId}; errors are {code,message,requestId}. Arrays have no invented total/page wrapper. Runtime actuator endpoints are documented separately in docs/api/runtime.md. Future reservation, classroom approval, maintenance and notification endpoints are not implemented."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Public deployment origin; local Compose gateway is http://127.0.0.1:18080. Internal operations override this server."
+    }
+  ],
+  "tags": [
+    {
+      "name": "Authentication"
+    },
+    {
+      "name": "Identity management"
+    },
+    {
+      "name": "Spaces"
+    },
+    {
+      "name": "Settings"
+    },
+    {
+      "name": "Check-in codes"
+    },
+    {
+      "name": "Audit"
+    },
+    {
+      "name": "Internal"
+    }
+  ],
+  "paths": {
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "login",
+        "summary": "Authenticate with username and password",
+        "tags": [
+          "Authentication"
+        ],
+        "description": "Only anonymous business operation. Returns an HS256 access JWT (local/default lifetime 15 minutes), Bearer type, UTC expiry and current actor. Invalid username, wrong password or disabled user all return the same AUTHENTICATION_FAILED 401. No refresh token or school SSO is implemented.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me": {
+      "get": {
+        "operationId": "currentActor",
+        "summary": "Read the current database-backed identity",
+        "tags": [
+          "Authentication"
+        ],
+        "description": "JWT subject identifies the user. Enabled state, authVersion, roles and permissions are read from PostgreSQL on every authenticated request; token role claims are not authoritative.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
+    "/api/v1/me/password": {
+      "put": {
+        "operationId": "changeOwnPassword",
+        "summary": "Change own password and invalidate old tokens",
+        "tags": [
+          "Authentication"
+        ],
+        "description": "Requires the current password. New password is BCrypt(12), 12–72 UTF-8 bytes. Successful change increments authVersion, invalidating all previously issued access tokens, including this request’s token. Log in again; no replacement token is returned.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordChangedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordChange"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users": {
+      "get": {
+        "operationId": "listUsers",
+        "summary": "List users",
+        "tags": [
+          "Identity management"
+        ],
+        "description": "Ordered by numeric ID; returns data array without total count. Password hashes and authVersion are never returned.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit50"
+          },
+          {
+            "$ref": "#/components/parameters/Offset"
+          }
+        ],
+        "x-required-permission": "user:manage",
+        "x-authorization-scope": "SYSTEM_ADMIN"
+      },
+      "post": {
+        "operationId": "createUser",
+        "summary": "Create a user with known roles",
+        "tags": [
+          "Identity management"
+        ],
+        "description": "Creates an enabled user. No room scope is granted implicitly. roleCodes may be empty; only the seven registered roles are accepted.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUser"
+              }
+            }
+          }
+        },
+        "x-required-permission": "user:manage",
+        "x-authorization-scope": "SYSTEM_ADMIN"
+      }
+    },
+    "/api/v1/users/{id}": {
+      "patch": {
+        "operationId": "updateUser",
+        "summary": "Update a user display name or enabled state",
+        "tags": [
+          "Identity management"
+        ],
+        "description": "At least one non-null field is required. Enabled-state change increments authVersion; disable/re-enable cannot revive an old token. Removing the last enabled SYSTEM_ADMIN is rejected and serialized with role changes.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUser"
+              }
+            }
+          }
+        },
+        "x-required-permission": "user:manage",
+        "x-authorization-scope": "SYSTEM_ADMIN"
+      }
+    },
+    "/api/v1/users/{id}/password": {
+      "put": {
+        "operationId": "resetUserPassword",
+        "summary": "Reset a user password",
+        "tags": [
+          "Identity management"
+        ],
+        "description": "Returns the user view, never a password or hash. Increments authVersion, invalidating all old user tokens.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPassword"
+              }
+            }
+          }
+        },
+        "x-required-permission": "user:manage",
+        "x-authorization-scope": "SYSTEM_ADMIN"
+      }
+    },
+    "/api/v1/users/{id}/roles": {
+      "put": {
+        "operationId": "replaceUserRoles",
+        "summary": "Replace all roles of a user",
+        "tags": [
+          "Identity management"
+        ],
+        "description": "An empty role list is allowed except for the last enabled SYSTEM_ADMIN. Removing ROOM_ADMIN clears that user’s room scopes. Database-backed roles take effect on the next request.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceRoles"
+              }
+            }
+          }
+        },
+        "x-required-permission": "user:manage",
+        "x-authorization-scope": "SYSTEM_ADMIN"
+      }
+    },
+    "/api/v1/users/{id}/room-scopes": {
+      "put": {
+        "operationId": "replaceUserRoomScopes",
+        "summary": "Replace the room scope of a room administrator",
+        "tags": [
+          "Identity management"
+        ],
+        "description": "Target must already have ROOM_ADMIN; every supplied room must exist. Empty roomIds removes all scope; assignments never grant roles. Scope is read live.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceRoomScopes"
+              }
+            }
+          }
+        },
+        "x-required-permission": "user:manage",
+        "x-authorization-scope": "SYSTEM_ADMIN"
+      }
+    },
+    "/api/v1/roles": {
+      "get": {
+        "operationId": "listRoles",
+        "summary": "List roles and current permission mappings",
+        "tags": [
+          "Identity management"
+        ],
+        "description": "The seven role definitions are reference data. This API does not create or delete roles.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "x-required-permission": "role:manage",
+        "x-authorization-scope": "SYSTEM_ADMIN"
+      }
+    },
+    "/api/v1/permissions": {
+      "get": {
+        "operationId": "listPermissions",
+        "summary": "List the permission dictionary",
+        "tags": [
+          "Identity management"
+        ],
+        "description": "Some dictionary entries describe later reservation/classroom/maintenance stages. Their presence does not expose those business endpoints.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "x-required-permission": "role:manage",
+        "x-authorization-scope": "SYSTEM_ADMIN"
+      }
+    },
+    "/api/v1/roles/{code}/permissions": {
+      "put": {
+        "operationId": "replaceRolePermissions",
+        "summary": "Replace permissions of an existing role",
+        "tags": [
+          "Identity management"
+        ],
+        "description": "Only existing dictionary permissions are accepted. The SYSTEM_ADMIN mapping is fixed and returns 409. Other changes take effect through live database authority lookup, even for already issued JWTs. A global operation still requires SYSTEM_ADMIN even when its permission is assigned to another role.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RoleCode"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplacePermissions"
+              }
+            }
+          }
+        },
+        "x-required-permission": "role:manage",
+        "x-authorization-scope": "SYSTEM_ADMIN"
+      }
+    },
+    "/api/v1/buildings": {
+      "get": {
+        "operationId": "listBuildings",
+        "summary": "List buildings",
+        "tags": [
+          "Spaces"
+        ],
+        "description": "All buildings, ordered by ID. Buildings have no enabled field in the current schema.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildingListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit100"
+          },
+          {
+            "$ref": "#/components/parameters/Offset"
+          }
+        ],
+        "x-required-permission": "space:view"
+      },
+      "post": {
+        "operationId": "createBuilding",
+        "summary": "Create a building",
+        "tags": [
+          "Spaces"
+        ],
+        "description": "Building code is unique. Space code and name values are stripped of surrounding whitespace. No hard-delete API is implemented.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "Location": {
+                "description": "Created resource URI.",
+                "schema": {
+                  "type": "string",
+                  "format": "uri-reference"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildingResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BuildingWrite"
+              }
+            }
+          }
+        },
+        "x-required-permission": "space:manage",
+        "x-authorization-scope": "SYSTEM_ADMIN"
+      }
+    },
+    "/api/v1/buildings/{id}": {
+      "put": {
+        "operationId": "updateBuilding",
+        "summary": "Replace a building code and name",
+        "tags": [
+          "Spaces"
+        ],
+        "description": "Both code and name are required. Duplicate building code returns 409.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildingResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BuildingWrite"
+              }
+            }
+          }
+        },
+        "x-required-permission": "space:manage",
+        "x-authorization-scope": "SYSTEM_ADMIN"
+      }
+    },
+    "/api/v1/rooms": {
+      "get": {
+        "operationId": "listRooms",
+        "summary": "List enabled rooms in the public catalog",
+        "tags": [
+          "Spaces"
+        ],
+        "description": "Only enabled rooms, even for SYSTEM_ADMIN. Optional buildingId filters the catalog. Use managed-rooms to discover disabled rooms within management scope. Ordered by ID.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/BuildingId"
+          },
+          {
+            "$ref": "#/components/parameters/Limit100"
+          },
+          {
+            "$ref": "#/components/parameters/Offset"
+          }
+        ],
+        "x-required-permission": "space:view"
+      },
+      "post": {
+        "operationId": "createRoom",
+        "summary": "Create a room",
+        "tags": [
+          "Spaces"
+        ],
+        "description": "Existing building required. Type is STUDY_ROOM or CLASSROOM. Code is unique within a building. enabled must be supplied explicitly.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "Location": {
+                "description": "Created resource URI.",
+                "schema": {
+                  "type": "string",
+                  "format": "uri-reference"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoomCreate"
+              }
+            }
+          }
+        },
+        "x-required-permission": "space:manage",
+        "x-authorization-scope": "SYSTEM_ADMIN"
+      }
+    },
+    "/api/v1/managed-rooms": {
+      "get": {
+        "operationId": "listManagedRooms",
+        "summary": "List rooms within management scope",
+        "tags": [
+          "Spaces"
+        ],
+        "description": "Includes enabled and disabled rooms. SYSTEM_ADMIN sees all; other callers see only explicit scope rows. This listing does not grant mutation rights: room changes separately require SYSTEM_ADMIN or ROOM_ADMIN plus scope.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/BuildingId"
+          },
+          {
+            "$ref": "#/components/parameters/Limit100"
+          },
+          {
+            "$ref": "#/components/parameters/Offset"
+          }
+        ],
+        "x-required-permission": "space:manage",
+        "x-authorization-scope": "SYSTEM_ADMIN or explicit user_room_scope"
+      }
+    },
+    "/api/v1/rooms/{id}": {
+      "get": {
+        "operationId": "getRoom",
+        "summary": "Read room metadata",
+        "tags": [
+          "Spaces"
+        ],
+        "description": "Enabled rooms are visible to catalog readers. Disabled rooms are hidden as 404 unless the actor is SYSTEM_ADMIN or scoped ROOM_ADMIN.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "x-required-permission": "space:view"
+      },
+      "patch": {
+        "operationId": "updateRoom",
+        "summary": "Update room metadata or enabled state",
+        "tags": [
+          "Spaces"
+        ],
+        "description": "Scoped ROOM_ADMIN can change only name and enabled. Supplying buildingId, code or type additionally requires SYSTEM_ADMIN. At least one non-null field is required; null is unchanged. No hard delete or reservation-side occupancy action is performed.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoomPatch"
+              }
+            }
+          }
+        },
+        "x-required-permission": "space:manage",
+        "x-authorization-scope": "SYSTEM_ADMIN or ROOM_ADMIN plus room scope"
+      }
+    },
+    "/api/v1/rooms/{roomId}/seats": {
+      "get": {
+        "operationId": "listRoomSeats",
+        "summary": "List seats of a room",
+        "tags": [
+          "Spaces"
+        ],
+        "description": "Catalog readers receive only enabled seats in an enabled room. SYSTEM_ADMIN/scoped ROOM_ADMIN can also see disabled seats and disabled own rooms. Ordered by seat ID. This metadata does not express occupancy truth.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeatListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RoomId"
+          },
+          {
+            "$ref": "#/components/parameters/Limit100"
+          },
+          {
+            "$ref": "#/components/parameters/Offset"
+          }
+        ],
+        "x-required-permission": "space:view"
+      },
+      "post": {
+        "operationId": "createSeat",
+        "summary": "Create a seat in a managed room",
+        "tags": [
+          "Spaces"
+        ],
+        "description": "Code is unique within the room. hasPowerOutlet and enabled are explicit booleans; room must exist.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "Location": {
+                "description": "Created resource URI.",
+                "schema": {
+                  "type": "string",
+                  "format": "uri-reference"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeatResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RoomId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeatCreate"
+              }
+            }
+          }
+        },
+        "x-required-permission": "space:manage",
+        "x-authorization-scope": "SYSTEM_ADMIN or ROOM_ADMIN plus room scope"
+      }
+    },
+    "/api/v1/seats/{id}": {
+      "patch": {
+        "operationId": "updateSeat",
+        "summary": "Update a seat within its source room scope",
+        "tags": [
+          "Spaces"
+        ],
+        "description": "Scoped ROOM_ADMIN can edit code, hasPowerOutlet or enabled. Supplying roomId requires SYSTEM_ADMIN; destination must exist. Null is unchanged; an empty patch is 400. No hard delete.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeatResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeatPatch"
+              }
+            }
+          }
+        },
+        "x-required-permission": "space:manage",
+        "x-authorization-scope": "SYSTEM_ADMIN or ROOM_ADMIN plus source room scope"
+      }
+    },
+    "/api/v1/settings": {
+      "get": {
+        "operationId": "getSettings",
+        "summary": "Read reservation configuration",
+        "tags": [
+          "Settings"
+        ],
+        "description": "Returns maxReservationHours. Phase 3 does not create or validate a reservation.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "x-required-permission": "settings:view"
+      },
+      "put": {
+        "operationId": "updateSettings",
+        "summary": "Set the maximum continuous reservation hours",
+        "tags": [
+          "Settings"
+        ],
+        "description": "A positive 32-bit integer is required. Persisted update and audit event commit together. Future M1 uses the internal read contract.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Settings"
+              }
+            }
+          }
+        },
+        "x-required-permission": "settings:manage",
+        "x-authorization-scope": "SYSTEM_ADMIN"
+      }
+    },
+    "/api/v1/rooms/{id}/checkin-code": {
+      "get": {
+        "operationId": "getTodayCheckinCode",
+        "summary": "Read today’s existing room code",
+        "tags": [
+          "Check-in codes"
+        ],
+        "description": "Read only: returns 404 CHECKIN_CODE_NOT_FOUND until today’s code has been created. Missing or disabled room returns 404. No generation or rotation occurs. Date is computed from injected Clock and business zone (local Asia/Shanghai). Eight cryptographically random characters exclude I, O, 0, 1. No global uniqueness, same-day rotation, QR payload or actual check-in is promised.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckinCodeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "x-required-permission": "checkin-code:manage",
+        "x-authorization-scope": "SYSTEM_ADMIN or ROOM_ADMIN plus room scope"
+      },
+      "post": {
+        "operationId": "ensureTodayCheckinCode",
+        "summary": "Create today’s code if absent, otherwise return it",
+        "tags": [
+          "Check-in codes"
+        ],
+        "description": "Ensure operation returns 200 for both initial generation and an existing code. The room/date primary key and room row lock make concurrent calls converge on one daily code and one creation audit event. A disabled room cannot generate a code. Date is computed from injected Clock and business zone (local Asia/Shanghai). Eight cryptographically random characters exclude I, O, 0, 1. No global uniqueness, same-day rotation, QR payload or actual check-in is promised.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckinCodeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "x-required-permission": "checkin-code:manage",
+        "x-authorization-scope": "SYSTEM_ADMIN or ROOM_ADMIN plus room scope"
+      }
+    },
+    "/api/v1/audit-events": {
+      "get": {
+        "operationId": "listAuditEvents",
+        "summary": "Query operation audit events",
+        "tags": [
+          "Audit"
+        ],
+        "description": "Optional exact uppercase targetType filter. Ordered by audit ID descending. Database app role may INSERT/SELECT but cannot UPDATE/DELETE/TRUNCATE audit rows. Business mutations and their audit record share a transaction; audit output contains no passwords, JWTs or check-in code plaintext. No public append endpoint exists.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEventListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AuditTargetType"
+          },
+          {
+            "$ref": "#/components/parameters/Limit50"
+          },
+          {
+            "$ref": "#/components/parameters/Offset"
+          }
+        ],
+        "x-required-permission": "audit:view",
+        "x-authorization-scope": "SYSTEM_ADMIN"
+      }
+    },
+    "/internal/v1/rooms/{id}": {
+      "get": {
+        "operationId": "internalGetRoom",
+        "summary": "Read room metadata for another service",
+        "tags": [
+          "Internal"
+        ],
+        "description": "Accepts distinct opaque service bearer credentials, never a user JWT. Includes enabled state even for disabled rooms; caller must enforce its own business eligibility. No cross-schema SQL is allowed.",
+        "security": [
+          {
+            "InternalCaller": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "servers": [
+          {
+            "url": "http://platform-service:8080",
+            "description": "Local Compose backend network only. Never publish this server or these paths through the public gateway."
+          }
+        ],
+        "x-internal-callers": [
+          "reservation-service",
+          "classroom-service",
+          "maintenance-service"
+        ]
+      }
+    },
+    "/internal/v1/rooms/{roomId}/seats": {
+      "get": {
+        "operationId": "internalListRoomSeats",
+        "summary": "Read all seat metadata of a room for another service",
+        "tags": [
+          "Internal"
+        ],
+        "description": "Includes enabled and disabled seats; room must exist. Ordered by ID, bounded limit/offset, no total field. Iterate until a page is shorter than limit. No occupancy state is returned.",
+        "security": [
+          {
+            "InternalCaller": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeatListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RoomId"
+          },
+          {
+            "$ref": "#/components/parameters/Limit100"
+          },
+          {
+            "$ref": "#/components/parameters/Offset"
+          }
+        ],
+        "servers": [
+          {
+            "url": "http://platform-service:8080",
+            "description": "Local Compose backend network only. Never publish this server or these paths through the public gateway."
+          }
+        ],
+        "x-internal-callers": [
+          "reservation-service",
+          "classroom-service",
+          "maintenance-service"
+        ]
+      }
+    },
+    "/internal/v1/settings": {
+      "get": {
+        "operationId": "internalGetSettings",
+        "summary": "Read shared configuration for another service",
+        "tags": [
+          "Internal"
+        ],
+        "description": "Read-only API available to reservation-, classroom- and maintenance-service identities. Default maxReservationHours is 4.",
+        "security": [
+          {
+            "InternalCaller": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "servers": [
+          {
+            "url": "http://platform-service:8080",
+            "description": "Local Compose backend network only. Never publish this server or these paths through the public gateway."
+          }
+        ],
+        "x-internal-callers": [
+          "reservation-service",
+          "classroom-service",
+          "maintenance-service"
+        ]
+      }
+    },
+    "/internal/v1/checkin-codes/verify": {
+      "post": {
+        "operationId": "internalVerifyCheckinCode",
+        "summary": "Verify a room’s current code without exposing it",
+        "tags": [
+          "Internal"
+        ],
+        "description": "Only reservation-service identity may call. Unknown/disabled room, absent current-date code or a well-formed mismatch returns 200 with valid:false. Malformed code/ID returns 400. Uses business date at request time and constant-time code comparison. It has no side effects and does not verify a reservation, user ownership or attendance; those remain M1 Phase 5 responsibilities.",
+        "security": [
+          {
+            "InternalCaller": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeVerificationResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeVerification"
+              }
+            }
+          }
+        },
+        "servers": [
+          {
+            "url": "http://platform-service:8080",
+            "description": "Local Compose backend network only. Never publish this server or these paths through the public gateway."
+          }
+        ],
+        "x-internal-callers": [
+          "reservation-service"
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "UserBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "HS256 access JWT from POST /api/v1/auth/login. Local/default expiry 15 minutes; issuer https://campus-resource.local/platform, audience campus-web. Roles/permissions and authVersion are checked against PostgreSQL each request. No refresh token."
+      },
+      "InternalCaller": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "opaque service secret",
+        "description": "Private backend-network credential. Three distinct secrets of at least 32 UTF-8 bytes identify reservation-service, classroom-service or maintenance-service. User JWTs are rejected. Only reservation-service can verify a check-in code."
+      }
+    },
+    "parameters": {
+      "Id": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
+        }
+      },
+      "RoomId": {
+        "name": "roomId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
+        }
+      },
+      "RoleCode": {
+        "name": "code",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[A-Z_]{1,64}$"
+        }
+      },
+      "BuildingId": {
+        "name": "buildingId",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
+        }
+      },
+      "Limit100": {
+        "name": "limit",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 100
+        }
+      },
+      "Limit50": {
+        "name": "limit",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 50
+        }
+      },
+      "Offset": {
+        "name": "offset",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        }
+      },
+      "AuditTargetType": {
+        "name": "targetType",
+        "in": "query",
+        "schema": {
+          "type": "string",
+          "pattern": "^[A-Z_]{1,32}$"
+        }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "requestId"
+        ],
+        "description": "Errors are flat objects; they do not contain data. Use code, not localized message text, for program logic."
+      },
+      "Actor": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "username": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "displayName": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "STUDENT",
+                "ROOM_ADMIN",
+                "DEPARTMENT_ADMIN",
+                "PROPERTY_STAFF",
+                "PROPERTY_MANAGER",
+                "OPERATOR",
+                "SYSTEM_ADMIN"
+              ]
+            },
+            "uniqueItems": true
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "reservation:create",
+                "reservation:view:self",
+                "classroom:apply",
+                "classroom:approve",
+                "maintenance:report",
+                "maintenance:assign",
+                "space:manage",
+                "user:manage",
+                "audit:view",
+                "space:view",
+                "settings:view",
+                "settings:manage",
+                "checkin-code:manage",
+                "role:manage"
+              ]
+            },
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "displayName",
+          "roles",
+          "permissions"
+        ]
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "writeOnly": true,
+            "minLength": 1,
+            "maxLength": 72,
+            "description": "Non-blank; at most 72 UTF-8 bytes."
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ]
+      },
+      "LoginResult": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "Sensitive HS256 JWT. Never log it or persist it in an URL."
+          },
+          "tokenType": {
+            "type": "string",
+            "enum": [
+              "Bearer"
+            ]
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "user": {
+            "$ref": "#/components/schemas/Actor"
+          }
+        },
+        "required": [
+          "accessToken",
+          "tokenType",
+          "expiresAt",
+          "user"
+        ]
+      },
+      "PasswordChange": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "format": "password",
+            "writeOnly": true,
+            "minLength": 1,
+            "maxLength": 72,
+            "description": "Non-blank; at most 72 UTF-8 bytes."
+          },
+          "newPassword": {
+            "type": "string",
+            "format": "password",
+            "writeOnly": true,
+            "minLength": 1,
+            "maxLength": 72,
+            "description": "12–72 UTF-8 bytes, non-blank. Character count is not the UTF-8 byte count.",
+            "x-utf8-min-bytes": 12,
+            "x-utf8-max-bytes": 72
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ]
+      },
+      "PasswordChanged": {
+        "type": "object",
+        "properties": {
+          "changed": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "changed"
+        ]
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "username": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "displayName": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "STUDENT",
+                "ROOM_ADMIN",
+                "DEPARTMENT_ADMIN",
+                "PROPERTY_STAFF",
+                "PROPERTY_MANAGER",
+                "OPERATOR",
+                "SYSTEM_ADMIN"
+              ]
+            }
+          },
+          "roomIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "displayName",
+          "enabled",
+          "roles",
+          "roomIds"
+        ]
+      },
+      "CreateUser": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$"
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Must contain a non-whitespace character."
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "writeOnly": true,
+            "minLength": 1,
+            "maxLength": 72,
+            "description": "12–72 UTF-8 bytes, non-blank. Character count is not the UTF-8 byte count.",
+            "x-utf8-min-bytes": 12,
+            "x-utf8-max-bytes": 72
+          },
+          "roleCodes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "STUDENT",
+                "ROOM_ADMIN",
+                "DEPARTMENT_ADMIN",
+                "PROPERTY_STAFF",
+                "PROPERTY_MANAGER",
+                "OPERATOR",
+                "SYSTEM_ADMIN"
+              ]
+            },
+            "maxItems": 7,
+            "description": "Known role codes. An empty array creates a user without roles; room scopes are never implicit."
+          }
+        },
+        "required": [
+          "username",
+          "displayName",
+          "password",
+          "roleCodes"
+        ]
+      },
+      "UpdateUser": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Must contain a non-whitespace character.",
+            "nullable": true
+          },
+          "enabled": {
+            "type": "boolean",
+            "nullable": true
+          }
+        },
+        "description": "At least one non-null field is required; empty or whitespace displayName is 422. Null/absent fields are unchanged."
+      },
+      "ResetPassword": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "format": "password",
+            "writeOnly": true,
+            "minLength": 1,
+            "maxLength": 72,
+            "description": "12–72 UTF-8 bytes, non-blank. Character count is not the UTF-8 byte count.",
+            "x-utf8-min-bytes": 12,
+            "x-utf8-max-bytes": 72
+          }
+        },
+        "required": [
+          "password"
+        ]
+      },
+      "ReplaceRoles": {
+        "type": "object",
+        "properties": {
+          "roleCodes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "STUDENT",
+                "ROOM_ADMIN",
+                "DEPARTMENT_ADMIN",
+                "PROPERTY_STAFF",
+                "PROPERTY_MANAGER",
+                "OPERATOR",
+                "SYSTEM_ADMIN"
+              ]
+            },
+            "maxItems": 7,
+            "description": "Known role codes. An empty array removes all roles; last enabled SYSTEM_ADMIN is protected."
+          }
+        },
+        "required": [
+          "roleCodes"
+        ]
+      },
+      "ReplaceRoomScopes": {
+        "type": "object",
+        "properties": {
+          "roomIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "maxItems": 1000
+          }
+        },
+        "required": [
+          "roomIds"
+        ],
+        "description": "Replaces the complete scope, not an additive patch. Target must have ROOM_ADMIN; every room must exist."
+      },
+      "Role": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "STUDENT",
+              "ROOM_ADMIN",
+              "DEPARTMENT_ADMIN",
+              "PROPERTY_STAFF",
+              "PROPERTY_MANAGER",
+              "OPERATOR",
+              "SYSTEM_ADMIN"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "permissionCodes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "reservation:create",
+                "reservation:view:self",
+                "classroom:apply",
+                "classroom:approve",
+                "maintenance:report",
+                "maintenance:assign",
+                "space:manage",
+                "user:manage",
+                "audit:view",
+                "space:view",
+                "settings:view",
+                "settings:manage",
+                "checkin-code:manage",
+                "role:manage"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "permissionCodes"
+        ]
+      },
+      "Permission": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "reservation:create",
+              "reservation:view:self",
+              "classroom:apply",
+              "classroom:approve",
+              "maintenance:report",
+              "maintenance:assign",
+              "space:manage",
+              "user:manage",
+              "audit:view",
+              "space:view",
+              "settings:view",
+              "settings:manage",
+              "checkin-code:manage",
+              "role:manage"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name"
+        ]
+      },
+      "ReplacePermissions": {
+        "type": "object",
+        "properties": {
+          "permissionCodes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "reservation:create",
+                "reservation:view:self",
+                "classroom:apply",
+                "classroom:approve",
+                "maintenance:report",
+                "maintenance:assign",
+                "space:manage",
+                "user:manage",
+                "audit:view",
+                "space:view",
+                "settings:view",
+                "settings:manage",
+                "checkin-code:manage",
+                "role:manage"
+              ]
+            },
+            "maxItems": 14
+          }
+        },
+        "required": [
+          "permissionCodes"
+        ],
+        "description": "Replaces all permissions of the role. SYSTEM_ADMIN mapping is fixed; no role or permission creation API exists."
+      },
+      "Building": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Must contain a non-whitespace character."
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name"
+        ]
+      },
+      "BuildingWrite": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Must contain a non-whitespace character."
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ]
+      },
+      "Room": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "buildingId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Must contain a non-whitespace character."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "STUDY_ROOM",
+              "CLASSROOM"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "buildingId",
+          "code",
+          "name",
+          "type",
+          "enabled"
+        ]
+      },
+      "RoomCreate": {
+        "type": "object",
+        "properties": {
+          "buildingId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Must contain a non-whitespace character."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "STUDY_ROOM",
+              "CLASSROOM"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "buildingId",
+          "code",
+          "name",
+          "type",
+          "enabled"
+        ]
+      },
+      "RoomPatch": {
+        "type": "object",
+        "properties": {
+          "buildingId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "nullable": true
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Must contain a non-whitespace character.",
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "STUDY_ROOM",
+              "CLASSROOM"
+            ],
+            "nullable": true
+          },
+          "enabled": {
+            "type": "boolean",
+            "nullable": true
+          }
+        },
+        "description": "At least one non-null field is required. buildingId, code or type require SYSTEM_ADMIN even when unchanged. Scoped ROOM_ADMIN can supply only name and enabled."
+      },
+      "Seat": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "roomId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+          },
+          "hasPowerOutlet": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "roomId",
+          "code",
+          "hasPowerOutlet",
+          "enabled"
+        ]
+      },
+      "SeatCreate": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+          },
+          "hasPowerOutlet": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "hasPowerOutlet",
+          "enabled"
+        ]
+      },
+      "SeatPatch": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "nullable": true
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+            "nullable": true
+          },
+          "hasPowerOutlet": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "enabled": {
+            "type": "boolean",
+            "nullable": true
+          }
+        },
+        "description": "At least one non-null field is required. Source room scope is checked. Supplying roomId requires SYSTEM_ADMIN and an existing target room."
+      },
+      "Settings": {
+        "type": "object",
+        "properties": {
+          "maxReservationHours": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1,
+            "maximum": 2147483647,
+            "description": "Default reference value is 4 hours. Phase 3 stores this value; reservation enforcement belongs to M1."
+          }
+        },
+        "required": [
+          "maxReservationHours"
+        ]
+      },
+      "CheckinCode": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "Current business date in CAMPUS_BUSINESS_ZONE; local Compose uses Asia/Shanghai."
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$",
+            "description": "Sensitive room/day code. Only authorized room managers can read it; never log it."
+          }
+        },
+        "required": [
+          "roomId",
+          "date",
+          "code"
+        ]
+      },
+      "CodeVerification": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "roomId",
+          "code"
+        ]
+      },
+      "CodeVerificationResult": {
+        "type": "object",
+        "properties": {
+          "valid": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "valid"
+        ],
+        "description": "No correct code is disclosed. True only for this enabled room and current business date; this is not a reservation check-in."
+      },
+      "AuditEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "actorUserId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "nullable": true
+          },
+          "sourceService": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "action": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "targetType": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "targetId": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "actorUserId",
+          "sourceService",
+          "action",
+          "targetType",
+          "targetId",
+          "requestId",
+          "occurredAt"
+        ]
+      },
+      "ActorResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Actor"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ]
+      },
+      "LoginResultResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/LoginResult"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ]
+      },
+      "PasswordChangedResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PasswordChanged"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ]
+      },
+      "UserResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/User"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ]
+      },
+      "RoleResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ]
+      },
+      "BuildingResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Building"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ]
+      },
+      "RoomResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Room"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ]
+      },
+      "SeatResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Seat"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ]
+      },
+      "SettingsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Settings"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ]
+      },
+      "CheckinCodeResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CheckinCode"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ]
+      },
+      "CodeVerificationResultResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CodeVerificationResult"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ]
+      },
+      "UserListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/User"
+            }
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ]
+      },
+      "RoleListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Role"
+            }
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ]
+      },
+      "PermissionListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Permission"
+            }
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ]
+      },
+      "BuildingListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Building"
+            }
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ]
+      },
+      "RoomListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Room"
+            }
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ]
+      },
+      "SeatListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Seat"
+            }
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ]
+      },
+      "AuditEventListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditEvent"
+            }
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ]
+      }
+    },
+    "responses": {
+      "400": {
+        "description": "VALIDATION_ERROR for malformed JSON, DTO/query validation or password byte length; EMPTY_PATCH for an empty space patch.",
+        "headers": {
+          "X-Request-ID": {
+            "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "401": {
+        "description": "UNAUTHORIZED for missing/invalid/expired/wrong-kind bearer credentials. Login or current-password mismatch uses AUTHENTICATION_FAILED.",
+        "headers": {
+          "X-Request-ID": {
+            "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "403": {
+        "description": "FORBIDDEN: authenticated caller lacks the required permission, SYSTEM_ADMIN role, room scope, or internal service capability.",
+        "headers": {
+          "X-Request-ID": {
+            "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "404": {
+        "description": "Resource missing or disabled room hidden from this caller; CHECKIN_CODE_NOT_FOUND until today’s enabled-room code is created.",
+        "headers": {
+          "X-Request-ID": {
+            "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "405": {
+        "description": "METHOD_NOT_ALLOWED for an unsupported controller method; gateway/security path rejection may occur earlier.",
+        "headers": {
+          "X-Request-ID": {
+            "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "409": {
+        "description": "DATA_CONFLICT for database constraints, LAST_SYSTEM_ADMIN, SYSTEM_ADMIN_PERMISSIONS_FIXED, or IDENTITY_CHANGED as applicable.",
+        "headers": {
+          "X-Request-ID": {
+            "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "422": {
+        "description": "INVALID_REFERENCE_OR_VALUE: unknown role/permission/room reference, room scope target without ROOM_ADMIN, empty user patch, or blank display name.",
+        "headers": {
+          "X-Request-ID": {
+            "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "500": {
+        "description": "INTERNAL_ERROR for unexpected failures; response contains no SQL, parameters or exception details.",
+        "headers": {
+          "X-Request-ID": {
+            "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "503": {
+        "description": "DATABASE_UNAVAILABLE for mapped database resource/identity-store unavailability.",
+        "headers": {
+          "X-Request-ID": {
+            "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    }
+  },
+  "externalDocs": {
+    "description": "Human-readable contract, role policy, date semantics and test scope",
+    "url": "../../docs/api/platform.md"
+  }
+}

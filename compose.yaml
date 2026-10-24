@@ -54,6 +54,11 @@ services:
       FLYWAY_PASSWORD: ${PLATFORM_FLYWAY_PASSWORD:?Run ./scripts/init-env.sh first}
       SPRING_PROFILES_ACTIVE: local
       CAMPUS_SEED_PASSWORD: ${DEV_SEED_PASSWORD:?Run ./scripts/init-env.sh first}
+      PLATFORM_JWT_SECRET: ${PLATFORM_JWT_SECRET:?Run ./scripts/init-env.sh first}
+      PLATFORM_RESERVATION_TOKEN: ${PLATFORM_RESERVATION_TOKEN:?Run ./scripts/init-env.sh first}
+      PLATFORM_CLASSROOM_TOKEN: ${PLATFORM_CLASSROOM_TOKEN:?Run ./scripts/init-env.sh first}
+      PLATFORM_MAINTENANCE_TOKEN: ${PLATFORM_MAINTENANCE_TOKEN:?Run ./scripts/init-env.sh first}
+      CAMPUS_BUSINESS_ZONE: ${CAMPUS_BUSINESS_ZONE:?Run ./scripts/init-env.sh first}
     build:
       <<: *backend-build
       args:

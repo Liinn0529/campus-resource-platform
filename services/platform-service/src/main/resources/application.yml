@@ -17,6 +17,22 @@ spring:
     create-schemas: false
     clean-disabled: true
     validate-migration-naming: true
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true
+campus:
+  jwt:
+    secret: ${PLATFORM_JWT_SECRET}
+    issuer: https://campus-resource.local/platform
+    audience: campus-web
+    ttl: PT15M
+  business-zone: ${CAMPUS_BUSINESS_ZONE}
+  cors:
+    origins: http://127.0.0.1:18080,http://localhost:18080,http://127.0.0.1:5173,http://localhost:5173
+  internal:
+    reservation-token: ${PLATFORM_RESERVATION_TOKEN}
+    classroom-token: ${PLATFORM_CLASSROOM_TOKEN}
+    maintenance-token: ${PLATFORM_MAINTENANCE_TOKEN}
 server:
   port: 8080
   shutdown: graceful
