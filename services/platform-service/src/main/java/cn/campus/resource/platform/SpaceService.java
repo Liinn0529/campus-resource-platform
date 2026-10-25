@@ -142,9 +142,14 @@ class SpaceService {
         return requireRoom(id);
     }
 
-    List<SpaceMapper.Seat> internalSeats(long roomId, int limit, int offset) {
+    List<SpaceMapper.Room> internalRooms(Long buildingId, int limit, int offset) {
+        return spaces.rooms(buildingId, limit, offset);
+    }
+
+    List<SpaceMapper.Seat> internalSeats(long roomId, boolean enabledOnly, Boolean hasPowerOutlet,
+            Long seatId, int limit, int offset) {
         requireRoom(roomId);
-        return spaces.seats(roomId, true, limit, offset);
+        return spaces.internalSeats(roomId, enabledOnly, hasPowerOutlet, seatId, limit, offset);
     }
 
     private SpaceMapper.Room requireRoom(long id) {

@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Campus Resource Platform — implemented D APIs",
-    "version": "0.1.0-phase3",
+    "version": "0.1.0-phase4-catalog",
     "description": "Static contract for Phase 3 source only. Public user JWT and private opaque service credentials are different trust domains. API success is {data,requestId}; errors are {code,message,requestId}. Arrays have no invented total/page wrapper. Runtime actuator endpoints are documented separately in docs/api/runtime.md. Future reservation, classroom approval, maintenance and notification endpoints are not implemented."
   },
   "servers": [
@@ -1923,11 +1923,11 @@
     "/internal/v1/rooms/{roomId}/seats": {
       "get": {
         "operationId": "internalListRoomSeats",
-        "summary": "Read all seat metadata of a room for another service",
+        "summary": "Read filtered seat metadata of a room for another service",
         "tags": [
           "Internal"
         ],
-        "description": "Includes enabled and disabled seats; room must exist. Ordered by ID, bounded limit/offset, no total field. Iterate until a page is shorter than limit. No occupancy state is returned.",
+        "description": "Includes enabled and disabled seats by default; room must exist. enabledOnly=true requires both seat and room enabled. Optional hasPowerOutlet and seatId filters apply in SQL before ordered limit/offset pagination; no total or occupancy field is returned. Iterate until a page is shorter than limit.",
         "security": [
           {
             "InternalCaller": []
@@ -1975,6 +1975,15 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/RoomId"
+          },
+          {
+            "$ref": "#/components/parameters/EnabledOnly"
+          },
+          {
+            "$ref": "#/components/parameters/HasPowerOutlet"
+          },
+          {
+            "$ref": "#/components/parameters/SeatId"
           },
           {
             "$ref": "#/components/parameters/Limit100"
@@ -2124,6 +2133,79 @@
           "reservation-service"
         ]
       }
+    },
+    "/internal/v1/rooms": {
+      "get": {
+        "operationId": "internalListRooms",
+        "summary": "List enabled room metadata for another service",
+        "tags": [
+          "Internal"
+        ],
+        "description": "Only enabled rooms, preserving both STUDY_ROOM and CLASSROOM types. Optional buildingId filters before ordered limit/offset pagination. Uses an opaque service identity, not a user JWT. No occupancy state is returned.",
+        "security": [
+          {
+            "InternalCaller": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/BuildingId"
+          },
+          {
+            "$ref": "#/components/parameters/Limit100"
+          },
+          {
+            "$ref": "#/components/parameters/Offset"
+          }
+        ],
+        "servers": [
+          {
+            "url": "http://platform-service:8080",
+            "description": "Local Compose backend network only. Never publish this server or these paths through the public gateway."
+          }
+        ],
+        "x-internal-callers": [
+          "reservation-service",
+          "classroom-service",
+          "maintenance-service"
+        ]
+      }
     }
   },
   "components": {
@@ -2216,6 +2298,36 @@
         "schema": {
           "type": "string",
           "pattern": "^[A-Z_]{1,32}$"
+        }
+      },
+      "EnabledOnly": {
+        "name": "enabledOnly",
+        "in": "query",
+        "required": false,
+        "description": "When true, include only enabled seats in an enabled room. False preserves the original metadata contract, including disabled seats.",
+        "schema": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "HasPowerOutlet": {
+        "name": "hasPowerOutlet",
+        "in": "query",
+        "required": false,
+        "description": "When supplied, return seats whose actual power-outlet flag equals the requested value. Applied before pagination.",
+        "schema": {
+          "type": "boolean"
+        }
+      },
+      "SeatId": {
+        "name": "seatId",
+        "in": "query",
+        "required": false,
+        "description": "Optional exact seat ID within the requested room, applied before pagination.",
+        "schema": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
         }
       }
     },
