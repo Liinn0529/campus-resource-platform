@@ -83,11 +83,12 @@ class RuntimeEndpointsTest {
 
     @Test
     void deniesUnimplementedAndSensitivePaths() {
-        for (String path : new String[] {"/actuator/env", "/actuator", "/api/v1/users",
-                "/internal/v1/room-blocks", "/login", "/actuator/health/liveness"}) {
+        for (String path : new String[] {"/actuator/env", "/actuator", "/login", "/actuator/health/liveness"}) {
             assertThat(http.getForEntity(path, String.class).getStatusCode())
                     .as(path).isEqualTo(HttpStatus.FORBIDDEN);
         }
+        assertThat(http.getForEntity("/api/v1/users", String.class).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(http.getForEntity("/internal/v1/room-blocks", String.class).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test
@@ -143,8 +144,8 @@ class RuntimeEndpointsTest {
 
     private void assertMinimumSeedCounts() {
         Map<String, Integer> expected = Map.of(
-                "role", 7, "user", 5, "user_role", 5, "permission", 0,
-                "role_permission", 0, "building", 2, "room", 4, "seat", 40);
+                "role", 7, "user", 5, "user_role", 5, "permission", 14,
+                "role_permission", 35, "building", 2, "room", 4, "seat", 40);
         expected.forEach((table, count) -> assertThat(
                 jdbc.queryForObject("SELECT COUNT(*) FROM platform.\"" + table + "\"", Integer.class))
                 .as("platform.%s", table).isEqualTo(count));

@@ -58,14 +58,21 @@ public final class DatabaseTestSupport {
         properties.add("spring.datasource.password", () -> appPassword(schema));
         properties.add("spring.flyway.user", () -> schema + "_migrator");
         properties.add("spring.flyway.password", () -> migratorPassword(schema));
+        if (schema.equals("platform")) {
+            properties.add("campus.jwt.secret", () -> "test-only-platform-jwt-secret-at-least-32-bytes");
+            properties.add("campus.business-zone", () -> "Asia/Shanghai");
+            properties.add("campus.internal.reservation-token", () -> "test-only-reservation-internal-token-at-least-32-bytes");
+            properties.add("campus.internal.classroom-token", () -> "test-only-classroom-internal-token-at-least-32-bytes");
+            properties.add("campus.internal.maintenance-token", () -> "test-only-maintenance-internal-token-at-least-32-bytes");
+        }
     }
 
     public static void assertMigratedAndIsolated(DataSource dataSource, Flyway flyway,
             PostgreSQLContainer<?> database, String ownSchema) throws SQLException {
         flyway.validate();
         assertThat(flyway.info().current()).isNotNull();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("1");
-        assertThat(flyway.info().applied()).hasSize(1);
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo(ownSchema.equals("platform") ? "3" : "1");
+        assertThat(flyway.info().applied()).hasSize(ownSchema.equals("platform") ? 3 : 1);
 
         try (Connection app = dataSource.getConnection();
                 Connection migrator = migratorConnection(database, ownSchema)) {
