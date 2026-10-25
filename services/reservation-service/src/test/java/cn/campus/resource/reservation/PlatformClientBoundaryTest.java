@@ -154,6 +154,15 @@ class PlatformClientBoundaryTest {
         rejected(() -> client.seat(1, 10), HttpStatus.UNPROCESSABLE_ENTITY, "RESOURCE_UNAVAILABLE");
     }
 
+    @Test
+    void rejectsAnExplicitNullPowerFlagInsteadOfTreatingItAsFalse() {
+        String seat = SEAT.replace("\"hasPowerOutlet\":true", "\"hasPowerOutlet\":null");
+        override.set(new Reply(200, envelope("[" + seat + "]"), null));
+        rejected(() -> client.seats(1, false, 100, 0), HttpStatus.SERVICE_UNAVAILABLE, "PLATFORM_UNAVAILABLE");
+        rejected(() -> client.seats(1, null, 100, 0), HttpStatus.SERVICE_UNAVAILABLE, "PLATFORM_UNAVAILABLE");
+        rejected(() -> client.seat(1, 10), HttpStatus.SERVICE_UNAVAILABLE, "PLATFORM_UNAVAILABLE");
+    }
+
     private void rejected(Executable call, HttpStatus status, String code) {
         ApiFailure failure = assertThrows(ApiFailure.class, call);
         assertThat(failure.status()).isEqualTo(status);

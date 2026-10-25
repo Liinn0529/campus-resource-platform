@@ -1,12 +1,12 @@
-# 需求基线（当前 Phase 3）
+# 需求基线（当前 Phase 4）
 
 本项目为“校园资源服务平台”。本文件将源执行提示转换为稳定、可验收的需求，不代表功能已经实现。唯一业务来源为 [CODEX_EXECUTION_PROMPT.md](CODEX_EXECUTION_PROMPT.md)；来源栏的“§一…§四十一”对应原文中文章节，“§五.1”等对应章节内服务小节，“Phase N”对应原文阶段标题。原文没有明确的设计不得借本文件悄然补全，集中记录于未决问题。
 
-Phase 0–2 已交付，用户确认继续后授权 Phase 3 公共层；本阶段按可运行分项完成实际验证并提交 GitHub。D 的登录/JWT/RBAC、用户/角色/权限、空间主数据、参数、每日房间签到码与审计属于当前范围。V2/V3 和 32 个公开/内部操作构成具体待审方案，见[平台 API](../api/platform.md)及[Phase 3 计划](../plans/phase-3.md)，完整后端 49 项与前端 6 项测试、lint/类型检查/构建已通过，Compose 保留原卷升级、七容器健康、实际 D API/权限/范围/码/审计、CORS 与日志抽查也已通过，Phase 3 完成后等待 Phase 4 确认；最终干净提交的重建元数据由交付报告另记，不把尚未执行的最终重建预填为成功。Phase 4–15 的预约/实际签到、审批、工单、CI/CD 和云部署尚未授权。下表阶段不构成提前执行授权；状态以 [TRACEABILITY.md](TRACEABILITY.md) 的逐项证据为准。
+Phase 0–3 已交付，用户继续确认后授权 Phase 4 基础预约；本阶段按可运行分项实际验证并提交 GitHub，完成后停止等待 Phase 5。当前范围为 M1 房间/座位/可用性、创建/取消、本人历史与再预约、房间锁和来源账本，以及真实 D HTTP 身份/元数据/参数。M1 新 V2、8 个公开操作及 D 内部目录扩展至 33 操作形成具体待审方案，见[预约 API](../api/reservation.md)与[Phase 4 计划](../plans/phase-4.md)。75 个后端测试已通过（完整 reactor 69 项后新增 6 项客户端边界，M1 最终子集 28 项），0 失败/错误/跳过；首次 Compose 保留原卷升级、七容器健康、真实网关公共层回归与预约流程、数据库/密码保留验证通过；最终干净 GitHub 构建元数据另按[验证记录](../review/phase-4-validation.md)实际核对，不预填。实际签到、提醒、违约、审批、工单、M2/M3 占用接口、完整业务 Web 与 CI/CD 尚未进入。本表的后续阶段不是提前执行授权，状态以 [TRACEABILITY.md](TRACEABILITY.md) 逐项证据为准。
 
 模块：D=platform-service（公共层），M1=reservation-service（自习座位与占用真值），M2=classroom-service（整教室审批），M3=maintenance-service（物业工单），Web=apps/web，Optional=最后可选自然语言 Agent。D 提供身份、权限、空间主数据、参数、签到码、通知和审计；M1/M2/M3 不得直接读 D 表。M2/M3 的房间占用及释放通过 M1 HTTP 契约执行。
 
-需求 ID 一经分配保持稳定：修改条目内容保留 ID；拆分时新增 ID 并记录关联，不重排现有编号。需求与 [TRACEABILITY.md](TRACEABILITY.md) 一对一；矩阵“Test”为计划验证方式，已有 Phase 1/2 的真实运行和数据库记录，Phase 3 新增 D 真实 HTTP/PostgreSQL 测试，完整后端 49 项通过、0 失败/错误/跳过；历史文档检查不替代业务测试。来源中的示例字段、路径和枚举按附录保留；源示例测试名和 DONE 状态不作为项目现状。
+需求 ID 一经分配保持稳定：修改条目内容保留 ID；拆分时新增 ID 并记录关联，不重排现有编号。需求与 [TRACEABILITY.md](TRACEABILITY.md) 一对一；矩阵“Test”为计划验证方式，已有 Phase 1/2 的真实运行和数据库记录，Phase 3 保留 D 真实 HTTP/PostgreSQL 测试；Phase 4 新增真实 D 子进程/HTTP、预约数据库和首次并发锁，当前 75 项后端测试通过、0 失败/错误/跳过；历史文档检查不替代业务测试。来源中的示例字段、路径和枚举按附录保留；源示例测试名和 DONE 状态不作为项目现状。
 
 共 **186 条需求**。各分类数量：REQ-P0: 8, REQ-GOV: 12, REQ-ARCH: 12, REQ-DATA: 12, REQ-D: 8, REQ-M1: 17, REQ-M2: 10, REQ-M3: 12, REQ-API: 8, REQ-SEC: 12, REQ-ENG: 9, REQ-UI: 9, REQ-TEST: 12, REQ-OPS: 16, REQ-AGENT: 7, REQ-ETH: 7, REQ-PH: 15。
 
@@ -494,24 +494,24 @@ Phase 0 当时的业务、Docker、CI 条件因阶段范围不适用，仅在文
 
 ## 未决问题（保留 15 项；本阶段具体方案待人工 review）
 
-Phase 2 建立隔离数据库基线。Phase 3 将 D 所需时区、身份、权限范围及响应方案写成具体代码/契约后交草稿 PR 人工 review，不将阶段执行授权视为方案已被审定。原文要求 schema、公共契约与跨模块变更人工 review，并未要求写代码前另设一次批准；本文件不据未决项额外停止已获授权的实现。下列 15 项全部保留，尚未涉及的业务政策不因 D 可运行而自动关闭，见 [数据所有权](../architecture/DATA_OWNERSHIP.md)。
+Phase 2 建立隔离数据库基线。Phase 3 对 D 时区、身份、范围和响应，Phase 4 对 M1 时间/取消/锁行/来源账本与真实 D HTTP 形成具体代码/契约，均交草稿 PR 人工 review，不将阶段执行授权视为方案已被审定。原文要求 schema、公共契约与跨模块变更人工 review，并未要求写代码前另设一次批准；本文件不据未决项额外停止已获授权的实现。下列 15 项全部保留，尚未涉及的业务政策不因 D 可运行而自动关闭，见 [数据所有权](../architecture/DATA_OWNERSHIP.md)。
 
 | ID | 歧义或缺失 | 关联需求 | 最迟处理阶段 |
 |---|---|---|---|
-| OQ-01 | M1 写明 NO_SHOW 状态，同时要求“取消预约”；需确定最终状态、取消时间窗口、签到窗口、COMPLETED 触发、NO_SHOW 后补签到政策与状态转换守卫。Phase 0 不把 NO_SHOW 覆盖成 CANCELLED。 | REQ-M1-006、009、011、013 | 4/5 |
-| OQ-02 | Phase 3 仅为 D 的每日签到码显式使用业务时区，本地 Asia/Shanghai；M1 的时间示例虽有 +08:00，跨日整点、区间开闭边界、未来可预约窗口及已有预约遇最大时长参数变化仍未定，不能从 D 时区推导全部预约政策。 | REQ-M1-003、004、017 | 3 D 方案待 review；4 M1 规则前 |
+| OQ-01 | Phase 4 草案仅本人 CREATED 且开始前可取消；重复 CANCELLED 返回原记录且不重复事件；历史为取消或区间结束，再预约新建 ID。当前不自动写 COMPLETED/NO_SHOW。源同时有 NO_SHOW 与“取消预约”，签到窗口、完成触发、补签到及违约状态仍留 Phase 5 确认。 | REQ-M1-006、009、011、013 | 4/5 |
+| OQ-02 | Phase 4 草案将带 offset 输入转 Instant，用显式业务时区（local Asia/Shanghai）校验整点和正整数小时，采用 [start,end)；新建/再预约开始不得早于 Clock，并读取本次 D 最大时长快照，参数变化不改写旧预约。不私加未来可预约天数/一人多座限制。方案待 review，签到、调度和组织政策不由此推定。 | REQ-M1-003、004、017 | 3 D 方案待 review；4 M1 规则前 |
 | OQ-03 | 提醒渠道（站内/邮件等）、T+10 对已签到者是否发送、调度频率、停机补发、去重及送达失败规则未指定。mailhog 仅可选不代表邮件已确定。 | REQ-D-006、REQ-M1-010 | 5 |
 | OQ-04 | Phase 3 草案创建 room_checkin_code，以 (room_id,date) 为主键、8 位 SecureRandom 字符、注入 Clock 和显式业务时区（local Asia/Shanghai）决定今日；POST ensure 并发/重复返回同条，GET 只读已有记录，不提供当日轮换或全局 code 唯一。只有 SYSTEM_ADMIN 或显式房间范围内 ROOM_ADMIN 可读码；内部仅 M1 可验码且不泄露正确码。方案待人工 review，QR 载荷、实际预约签到窗口及补签到留 Phase 5，不冒充已经确定。 | REQ-DATA-005、REQ-D-005、REQ-M1-013 | 3 具体方案待 review；5 实际签到前 |
 | OQ-05 | M2 审批超时阈值、每级审批责任范围、撤销允许状态、已批准申请撤销、正常到期释放及释放失败后显示状态均未定义。 | REQ-M2-002、004、008 | 6 |
 | OQ-06 | M3 rejectAcceptance 返回哪个状态、验收权限、评价规则、可取消范围、due_at 计算、升级接收方/重复升级与释放失败恢复未定义。 | REQ-M3-004..011 | 7 |
-| OQ-07 | 唯一键包含 source_type，DELETE 路径却没有它；需确认来源模块与类型是否固定一一映射、source_ref_id 唯一范围、重复释放和释放后重建语义。幂等 payload 的“相同”比较方式也未定义。Phase 2 未建 seat_occupancy，未更改原始唯一键或释放 API。 | REQ-DATA-004、REQ-API-005、006 | 2 已保留；4 模型前，8 集成前 |
+| OQ-07 | Phase 4 V2 原样保留 (source_module,source_ref_id,source_type) 唯一键；M1 来源为 M1/RESERVATION/预约ID，取消精确释放且保留来源，再预约使用新 ID。ACTIVE/RELEASED 为占用生命周期草案；M2/M3 DELETE 缺 source_type、来源重用与同载荷比较仍留 Phase 8 契约审阅，本轮不提供内部占用写接口。 | REQ-DATA-004、REQ-API-005、006 | 2 已保留；4 模型前，8 集成前 |
 | OQ-08 | “最多 3 次”指重试 3 次还是总尝试 3 次；退避、状态持久化、进程重启/并发 worker、4xx 的终止状态、SYNC_FAILED 人工恢复、释放是否用同样重试均需确认。 | REQ-ARCH-011、REQ-API-007、REQ-M2-007、REQ-M3-011 | 6–8 |
 | OQ-09 | M2/M3 房间占用遇现有 M1 预约时的拒绝、取消、通知及补偿政策未给出；禁止擅自清空既有预约或用维修优先级绕开约束。 | REQ-M1-004、015..017、REQ-ETH-007 | 6–8 |
-| OQ-10 | Phase 3 已实现 32 个 D 操作及 OpenAPI：HS256、固定 issuer/audience、15 分钟 access JWT、DB 实时权限/authVersion；内部 opaque 三调用方身份与用户 JWT 分离，仅 M1 可验码，网关隐藏 internal。SYSTEM_ADMIN 全局、ROOM_ADMIN 显式房间范围且默认无授权是待审草案。当前只有四个内部主数据/参数/验码操作，真实模块 HTTP 调用、远程身份/审计写入、通知投递、部门审批范围和生产秘密轮换仍留相关阶段。 | REQ-ARCH-006、REQ-D-001..007、REQ-SEC-002..004、011 | 3 D 方案待 review；4–8 调用与业务前 |
+| OQ-10 | Phase 4 D 增至 33 操作：JWT/DB 实时权限与三调用方 opaque 身份保留，内部增加启用房间列表/座位筛选。M1 每次真实 HTTP 转发用户 JWT 到 D /api/v1/me，另用自身 opaque 凭据获取主数据/参数，不共享签名密钥或 D 表；D 故障/无效响应失败关闭。SYSTEM_ADMIN 全局、ROOM_ADMIN 显式范围、M1 本人隔离仍是待审方案；远程审计写入、通知、部门范围和生产轮换留后续。 | REQ-ARCH-006、REQ-D-001..007、REQ-SEC-002..004、011 | 3 D 方案待 review；4–8 调用与业务前 |
 | OQ-11 | Phase 3 保持七角色、五个演示用户及各自原有一个角色，V3 的 14 权限/初始 35 角色权限关系是全环境参考目录，不是新增演示用户。没有 DEPARTMENT_ADMIN、PROPERTY_MANAGER 或 OPERATOR 演示用户；demo_room_admin 默认无房间范围。系统管理员可通过授权管理创建额外业务账号、赋角色/范围，完整审批/派单演示仍须明确安排，不扩充 local seed。 | REQ-DATA-011、REQ-M2-002、REQ-SEC-004 | 3 参考目录/管理方案待 review；6 演示前 |
-| OQ-12 | Phase 3 审计仅存 actor ID、来源、动作、目标 ID、requestId、时间，与 D 修改同事务且 app 不可 UPDATE/DELETE；日志使用路由模板，不收请求体、密码、JWT 或签到码。违约/预约/工单/审计/日志保存期限、导出/删除与个人信息政策仍未确定，不将当前未清理等同于永久保存政策；继续记录伦理决策。 | REQ-ETH-001..007、REQ-SEC-012 | 3 持续审阅；各相关生命周期实现前 |
-| OQ-13 | Phase 2 的四对 migrator/app 账号、schema owner/历史保护和 D 八表保留；Phase 3 用新 V2/V3 增加 auth_version、user_room_scope、system_setting、room_checkin_code、append-only audit_log 及参考权限目录，不修改 V1。具体方案仍待人工 review；seat_occupancy.status、M3 表名、room_gate 初始化/缺行策略未定，不用 D 新表替代业务模型。 | REQ-DATA-001..008、REQ-ARCH-008 | 3 D 扩展待 review；4/5/6/7 业务建模前 |
-| OQ-14 | Phase 3 的 32 个 D 操作采用 data/requestId 与 code/message/requestId；JSON 成功使用 200/201，暂无硬删除或 204；列表 data 为数组，limit 1–100、offset≥0，用户/审计默认 50、空间默认 100，字段/错误码见 OpenAPI。以上为具体待审方案；网关自身拒绝/超时先于应用时不冒充 JSON envelope。未来 DELETE 重复响应、占用释放及 204 规则仍留 Phase 8。 | REQ-API-002、003、005 | 3 D 契约待 review；8 DELETE 前 |
+| OQ-12 | Phase 3 D 审计只存 actor ID、来源、动作、目标 ID、requestId、时间，与 D 修改同事务且 app 不可 UPDATE/DELETE。Phase 4 预约事件与预约/账本同事务；取消保留历史，日志仅模板路径/最小关联字段，不收正文或凭据。预约/违约/工单/审计/日志的保留、导出、删除和个人信息政策仍未定，不把缺少清理当作永久保存。 | REQ-ETH-001..007、REQ-SEC-012 | 3 持续审阅；各相关生命周期实现前 |
+| OQ-13 | Phase 2 四对账号/schema/history 边界和 D V1–V3 保留；Phase 4 追加 M1 V2 的 room_gate、seat_reservation、完整11字段 seat_occupancy 和 reservation_event。锁行事务内 INSERT ON CONFLICT 懒建后 FOR UPDATE，首次并发亦受锁；占用 ACTIVE/RELEASED，null seat 整房间/null end 开放结束。具体方案待 review；checkin/violation、M2/M3 表和资源生命周期协调仍留后续。 | REQ-DATA-001..008、REQ-ARCH-008 | 3 D 扩展待 review；4/5/6/7 业务建模前 |
+| OQ-14 | 当前 D 33/M1 8 操作使用成功 data/requestId 与失败 code/message/requestId。M1 201 新建/再预约、200 查询/取消，个人列表 current/history、limit 默认50，目录默认100，范围1–100；字段/状态见 OpenAPI。重复取消 200 原结果，外部响应无效 503；网关自身拒绝/超时不冒充应用 envelope。暂无204/硬删除；占用 DELETE 重复/释放语义留 Phase 8，方案待人工 review。 | REQ-API-002、003、005 | 3 D 契约待 review；8 DELETE 前 |
 | OQ-15 | 云地域、域名、证书、SWR 命名、测试服务器和生产审批操作人、secret 注入/轮换、备份和保留策略未指定，待对应运维阶段确定。 | REQ-OPS-005..014、REQ-SEC-005、008..011 | 12–14 |
 
 ## 来源覆盖索引

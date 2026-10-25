@@ -2,6 +2,8 @@ package cn.campus.resource.reservation;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.annotation.Nulls;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
@@ -21,7 +23,8 @@ import org.springframework.web.client.RestClientResponseException;
 class PlatformClient {
     record Room(long id, long buildingId, String code, String name, String type,
             @JsonProperty(required = true) boolean enabled) { }
-    record Seat(long id, long roomId, String code, @JsonProperty(required = true) boolean hasPowerOutlet,
+    record Seat(long id, long roomId, String code,
+            @JsonProperty(required = true) @JsonSetter(nulls = Nulls.FAIL) boolean hasPowerOutlet,
             @JsonProperty(required = true) boolean enabled) { }
     record Settings(int maxReservationHours) { }
     @JsonIgnoreProperties(ignoreUnknown = true)

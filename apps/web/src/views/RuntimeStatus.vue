@@ -32,7 +32,7 @@ function displayTime(value: string) {
       aria-labelledby="page-title"
     >
       <p class="eyebrow">
-        PHASE 03 · 公共服务
+        PHASE 04 · 基础预约
       </p>
       <h1 id="page-title">
         服务运行状态
@@ -41,7 +41,7 @@ function displayTime(value: string) {
         检查基础服务是否在线，以及当前运行的构建版本。
       </p>
       <div class="scope-note">
-        公共层已提供登录、权限与空间管理接口。本页用于运行检查；预约、审批和报修业务将在后续阶段开放。
+        已提供公共层与基础预约接口。本页用于运行检查；签到、审批、报修和完整业务页面将在后续阶段开放。
       </div>
     </section>
 

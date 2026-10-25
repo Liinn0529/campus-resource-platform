@@ -2,11 +2,11 @@
 
 - 状态：**Proposed / 待人工 Review**
 - 日期：2026-10-20
-- 阶段：Phase 0 起草；Phase 2/3 补充实施范围
+- 阶段：Phase 0 起草；Phase 2/3/4 补充实施范围
 - 决策来源：[CODEX_EXECUTION_PROMPT.md](../requirements/CODEX_EXECUTION_PROMPT.md)第 4–10、16–18、24、29–37 节
 - 关联：[ARCHITECTURE.md](../architecture/ARCHITECTURE.md)、[DATA_OWNERSHIP.md](../architecture/DATA_OWNERSHIP.md)、[REQUIREMENTS.md](../requirements/REQUIREMENTS.md)、[TRACEABILITY.md](../requirements/TRACEABILITY.md)
 
-本 ADR 记录用户源文件已指定的架构约束及其影响。Proposed 表示尚待人工 Review，不表示可以自由替换源要求，也不表示人类已批准该文档或任何数据库/公共契约变更。Phase 0 起草时尚无服务或数据库；Phase 1/2 已交付骨架和隔离数据库。Phase 3 在 D 追加 V2/V3、32 个公开/内部操作和身份/角色/权限/空间/参数/日码/审计，保留七角色、五个 local seed 用户。后端 49 项、前端 6 项及保留原卷升级/七容器/实际 D API 验收通过。具体数据边界见 [DATA_OWNERSHIP.md](../architecture/DATA_OWNERSHIP.md)，实际证据见 [Phase 3 记录](../plans/phase-3.md)；M1/M2/M3 业务、通知投递、完整 Web 和生产部署仍属后续阶段。
+本 ADR 记录用户源文件已指定的架构约束及其影响。Proposed 表示尚待人工 Review，不表示可以自由替换源要求，也不表示人类已批准该文档或任何数据库/公共契约变更。Phase 0 起草时尚无服务或数据库；Phase 1/2 已交付骨架和隔离数据库。Phase 3 在 D 追加 V2/V3、32 个公开/内部操作和身份/角色/权限/空间/参数/日码/审计，保留七角色、五个 local seed 用户。后端 49 项、前端 6 项及保留原卷升级/七容器/实际 D API 验收通过。具体数据边界见 [DATA_OWNERSHIP.md](../architecture/DATA_OWNERSHIP.md)，实际证据见 [Phase 3 记录](../plans/phase-3.md)；Phase 4 进一步追加 M1 V2 四表/8 个公开操作与 M1→D 真实身份/目录/参数 HTTP（D 增至 33 操作），当前 75 个后端测试通过；首次 Compose 保留原卷升级/七容器/真实网关流程及数据保留验收通过，最终干净版本重建另见 [Phase 4 验证](../review/phase-4-validation.md)，不预填。实际签到、M2/M3 业务与占用 HTTP、通知投递、完整 Web 和生产部署仍属后续阶段。
 
 ## 背景
 
@@ -54,9 +54,9 @@
 | 释放契约 | DELETE 两段标识如何唯一对应三元键；重复释放、内容冲突、引用重用与释放失败状态 |
 | 重试语义 | “最多 3 次”包含首次调用与否、调度间隔、持久化恢复、4xx 的最终处理及人工恢复入口 |
 | 资源生命周期 | D 资源创建/停用/删除与 M1 `room_gate`、已存在预约和占用之间的协调 |
-| 时间与业务政策 | 时区、区间端点、签到/取消窗口、NO_SHOW 与取消的状态表达、审批/维修超时阈值 |
+| 时间与业务政策 | Phase 4 的显式时区/整点、半开区间、当前参数、开始前取消/历史再预约已有待审方案；签到窗口、NO_SHOW/完成、审批/维修超时仍未定 |
 | 安全和数据最小化 | Phase 3 的 D JWT/独立内部凭据/房间范围已有具体待审方案；其他模块接入、部门范围、通知/跨服务审计失败和保留/删除周期仍待明确 |
 
-Phase 0 的历史验收为文档存在、需求可追踪、边界有文字说明、未提前实现业务；Phase 1 已有运行端点和容器验收记录。Phase 2 使用真实 PostgreSQL/Testcontainers 验证迁移、schema 权限隔离、最小 seed 及幂等。Phase 3 的 49 项后端测试和实际 Compose/HTTP 验收覆盖 D 身份权限、范围、日码及审计；它不替代 M1 房间锁/占用唯一约束、M2/M3 到 M1 的幂等业务 E2E 或生产部署验证。
+Phase 0 的历史验收为文档存在、需求可追踪、边界有文字说明、未提前实现业务；Phase 1 已有运行端点和容器验收记录。Phase 2 使用真实 PostgreSQL/Testcontainers 验证迁移、schema 权限隔离、最小 seed 及幂等。Phase 3 的 49 项后端测试和实际 Compose/HTTP 验收覆盖 D 身份权限、范围、日码及审计；Phase 4 真实 D JAR/HTTP 与 PostgreSQL 已验证 M1 首次锁行竞争、同座位仅一成功、取消/再预约、权限和三来源/开放结束冲突；不替代 M2/M3 到 M1 的占用写接口/幂等业务 E2E 或生产部署验证。
 
-人工 Review 通过后方可记录 ADR 接受状态；本轮 Phase 3 完成后须停止，等待用户明确确认再进入 Phase 4。文档的 Proposed 状态不能被阶段执行授权、测试通过、Git 提交或上传仓库自动替代。
+人工 Review 通过后方可记录 ADR 接受状态；本轮 Phase 4 完成后须停止，等待用户明确确认再进入 Phase 5。文档的 Proposed 状态不能被阶段执行授权、测试通过、Git 提交或上传仓库自动替代。
