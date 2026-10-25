@@ -97,7 +97,7 @@ class PlatformSecurity {
                 .addFilterBefore(new InternalTokenFilter(json, reservation, classroom, maintenance),
                         AnonymousAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.GET, "/internal/v1/rooms/**", "/internal/v1/settings")
+                        .requestMatchers(HttpMethod.GET, "/internal/v1/rooms", "/internal/v1/rooms/**", "/internal/v1/settings")
                             .hasAuthority("SERVICE_READ")
                         .requestMatchers(HttpMethod.POST, "/internal/v1/checkin-codes/verify")
                             .hasAuthority("SERVICE_RESERVATION")

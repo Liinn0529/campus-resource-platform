@@ -1,6 +1,6 @@
 # Phase 3 平台 API 契约
 
-本文件描述 D 公共层的实际代码方案，完整机器契约为 [OpenAPI 3 JSON](../../contracts/openapi/platform.v1.json)。当前仍在运行验证和人工审阅前阶段，接口存在不代表测试或阶段验收已经完成。运行信息端点另见 [runtime.md](runtime.md)。本文共列 32 个方法/路径组合，不包含尚未实现的预约、实际签到、审批、工单、通知投递或远程审计写入端点。
+本文件描述 D 公共层的实际代码方案，完整机器契约为 [OpenAPI 3 JSON](../../contracts/openapi/platform.v1.json)。Phase 3 交付基础能力，Phase 4 增加内部房间目录及座位筛选；真实结果以阶段验证记录为准，不以静态契约代替运行验证或人工审阅。运行信息端点另见 [runtime.md](runtime.md)。本文共列 33 个方法/路径组合，不包含其他模块的预约、实际签到、审批、工单、通知投递或远程审计写入端点。
 
 ## 地址、认证与响应
 
@@ -99,17 +99,20 @@ Building 为 id/code/name；Room 另含 buildingId/type/enabled；Seat 为 id/ro
 
 D 修改与审计同事务。AuditEvent 包含 id、actorUserId、sourceService、action、targetType、targetId、requestId、occurredAt，没有输入正文、密码、JWT 或签到码。targetType 过滤为 `[A-Z_]{1,32}`；审计应用身份不可 UPDATE/DELETE，查询由权限控制。审计保存期限仍未定，当前不提供清理或导出机制。
 
-## 私网内部接口（4 个操作）
+## 私网内部接口（5 个操作）
 
 以下请求只能在 backend 网络访问 `http://platform-service:8080`，公网/本地浏览器网关对 `/internal` 始终返回 404。Header 同样使用 `Authorization: Bearer <opaque service secret>`，但它是与用户 JWT 完全分开的秘密和安全链；用户 JWT 不能替代服务身份。
 
 | 方法与路径 | 能力 | 调用方 |
 |---|---|---|
-| GET /internal/v1/rooms/{id} | 读取房间主数据，包括 enabled | reservation-service、classroom-service、maintenance-service |
-| GET /internal/v1/rooms/{roomId}/seats | 读取房间座位主数据，包括停用座位，支持分页 | 三个服务身份 |
+| GET /internal/v1/rooms | 启用房间目录，buildingId 可选，按 ID 排序与分页，保留原始房间类型 | reservation-service、classroom-service、maintenance-service |
+| GET /internal/v1/rooms/{id} | 读取房间主数据，包括 enabled | 三个服务身份 |
+| GET /internal/v1/rooms/{roomId}/seats | 座位主数据分页；enabledOnly、hasPowerOutlet、seatId 可选筛选 | 三个服务身份 |
 | GET /internal/v1/settings | 读取最大预约时长 | 三个服务身份 |
 | POST /internal/v1/checkin-codes/verify | `{roomId,code}` → `{valid:boolean}` | 仅 reservation-service |
 
 三个秘密分别对应 `PLATFORM_RESERVATION_TOKEN`、`PLATFORM_CLASSROOM_TOKEN`、`PLATFORM_MAINTENANCE_TOKEN`，必须独立且至少 32 个 UTF-8 字节。D 根据受验证的凭据判断调用方，不信任请求体自报 module。语法正确但房间不存在/停用、当日未生成码或不匹配均返回 200、valid=false；非法 ID 或不是合法 8 位格式的 code 返回 400。校验不生成记录、不泄露正确码，也不校验预约或用户归属；这些属于 M1 的实际签到阶段。
+
+内部目录的 limit 为 1–100（默认 100），offset≥0；调用方逐页读取，不能把第一页当成完整数据。座位默认仍包含停用主数据，以保留原契约；`enabledOnly=true` 时只返回启用房间内的启用座位。`hasPowerOutlet=true/false` 按真实插座标记筛选，`seatId` 是房间内的精确正整数 ID；全部筛选在 SQL 的 LIMIT/OFFSET 前执行。禁用房间在 enabledOnly 模式返回空座位列表，未知房间返回 404。D 只提供主数据快照，不返回或判断 M1 占用状态。
 
 通知和跨服务审计写入尚无可调用实现。后续应先明确调用身份、字段最小化、幂等/投递状态和保存政策，再增加有真实行为的契约，不能返回空成功表示已经送达或审计完成。

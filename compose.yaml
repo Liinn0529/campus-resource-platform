@@ -66,12 +66,18 @@ services:
         SERVICE_NAME: platform-service
   reservation-service:
     <<: *backend
+    depends_on:
+      postgres: {condition: service_healthy}
+      platform-service: {condition: service_healthy}
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/campus_resource?currentSchema=reservation
       DB_USERNAME: reservation_app
       DB_PASSWORD: ${RESERVATION_DB_PASSWORD:?Run ./scripts/init-env.sh first}
       FLYWAY_USERNAME: reservation_migrator
       FLYWAY_PASSWORD: ${RESERVATION_FLYWAY_PASSWORD:?Run ./scripts/init-env.sh first}
+      PLATFORM_BASE_URL: http://platform-service:8080
+      PLATFORM_RESERVATION_TOKEN: ${PLATFORM_RESERVATION_TOKEN:?Run ./scripts/init-env.sh first}
+      CAMPUS_BUSINESS_ZONE: ${CAMPUS_BUSINESS_ZONE:?Run ./scripts/init-env.sh first}
     build:
       <<: *backend-build
       args:

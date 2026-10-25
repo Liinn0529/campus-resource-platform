@@ -121,6 +121,14 @@ class SpaceController {
         return ApiEnvelope.ok(spaces.updateSeat(id, input));
     }
 
+    @GetMapping("/internal/v1/rooms")
+    ApiEnvelope<List<SpaceMapper.Room>> internalRooms(
+            @RequestParam(required = false) @Positive Long buildingId,
+            @RequestParam(defaultValue = "100") @Min(1) @Max(100) int limit,
+            @RequestParam(defaultValue = "0") @Min(0) int offset) {
+        return ApiEnvelope.ok(spaces.internalRooms(buildingId, limit, offset));
+    }
+
     @GetMapping("/internal/v1/rooms/{id}")
     ApiEnvelope<SpaceMapper.Room> internalRoom(@PathVariable @Positive long id) {
         return ApiEnvelope.ok(spaces.internalRoom(id));
@@ -128,8 +136,11 @@ class SpaceController {
 
     @GetMapping("/internal/v1/rooms/{roomId}/seats")
     ApiEnvelope<List<SpaceMapper.Seat>> internalSeats(@PathVariable @Positive long roomId,
+            @RequestParam(defaultValue = "false") boolean enabledOnly,
+            @RequestParam(required = false) Boolean hasPowerOutlet,
+            @RequestParam(required = false) @Positive Long seatId,
             @RequestParam(defaultValue = "100") @Min(1) @Max(100) int limit,
             @RequestParam(defaultValue = "0") @Min(0) int offset) {
-        return ApiEnvelope.ok(spaces.internalSeats(roomId, limit, offset));
+        return ApiEnvelope.ok(spaces.internalSeats(roomId, enabledOnly, hasPowerOutlet, seatId, limit, offset));
     }
 }

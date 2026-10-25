@@ -86,6 +86,19 @@ interface SpaceMapper {
             @Param("limit") int limit, @Param("offset") int offset);
 
     @Select("""
+            SELECT s.id, s.room_id AS "roomId", s.code, s.has_power_outlet AS "hasPowerOutlet", s.enabled
+            FROM platform.seat s JOIN platform.room r ON r.id = s.room_id
+            WHERE s.room_id = #{roomId}
+              AND (NOT #{enabledOnly} OR (s.enabled AND r.enabled))
+              AND (#{hasPowerOutlet}::boolean IS NULL OR s.has_power_outlet = #{hasPowerOutlet})
+              AND (#{seatId}::bigint IS NULL OR s.id = #{seatId})
+            ORDER BY s.id LIMIT #{limit} OFFSET #{offset}
+            """)
+    List<Seat> internalSeats(@Param("roomId") long roomId, @Param("enabledOnly") boolean enabledOnly,
+            @Param("hasPowerOutlet") Boolean hasPowerOutlet, @Param("seatId") Long seatId,
+            @Param("limit") int limit, @Param("offset") int offset);
+
+    @Select("""
             SELECT id, room_id AS "roomId", code, has_power_outlet AS "hasPowerOutlet", enabled
             FROM platform.seat WHERE id = #{id} FOR UPDATE
             """)
