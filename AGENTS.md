@@ -2,11 +2,11 @@
 
 ## 当前阶段与依据
 
-Phase 0–5 已交付，用户在 Phase 5 交付后回复“继续”，现已授权 Phase 6：M2 整教室申请与审批。Phase 6 完成后必须停止，等待用户明确确认才能进入 Phase 7。一次只完成一个 Phase；上传 GitHub、创建 PR 或审核文档均不等于批准下一阶段。
+Phase0–6已交付，用户在Phase6交付后确认继续，现已授权Phase7物业报修工单。Phase7完成后停止，等待确认才能进入Phase8。上传GitHub或PR不等于下一阶段授权。
 
 需求依据是 [原始执行文档](docs/requirements/CODEX_EXECUTION_PROMPT.md)，规范化需求见 [REQUIREMENTS](docs/requirements/REQUIREMENTS.md)，状态见 [TRACEABILITY](docs/requirements/TRACEABILITY.md)。保留未完成需求，不以删除条目消除欠账。发现冲突或歧义，记录并交由人工确认，不悄悄改写需求。
 
-Phase 0–5 的治理、工程、数据库、D 与 M1 功能保留。当前 Phase 6 允许 M2 提交、两级审批、拒绝、前置撤销、审批超时、持久同步状态及真实 HTTP 客户端；D 仅扩展当前本人审批房间范围读取及 DEPARTMENT_ADMIN 显式范围分配。禁止提前实现 M3 工单、Phase 8 M1 room-blocks 接口、完整 Web 或 CI/CD。M1 当前未开放内部占用写接口时，真实调用失败必须保留 SYNC_FAILED，不能用生产假回执/假 APPROVED 掩盖依赖。批准后的取消/到期释放、未知回执补偿仍留 Phase 8。不扩充五个 seed 用户，不虚构部门组织。schema 与公共契约以具体可运行草稿 PR 人工 review；未定业务政策明确记录方案，不将后续阶段标为完成。
+Phase7允许M3报修、派单、开始、完工、验收/拒绝验收、前置取消、评价、超时升级及真实M1同步客户端；D仅增加M3可访问的当前维修人员资格读取。保留Phase0–6；M1真实封房/释放接口留Phase8，生产失败必须如实保存SYNC_FAILED。完整Web/CI仍留对应阶段。不扩充五个seed用户。schema/公共契约与未定政策以具体可运行草稿PR人工review，不预先当成批准。
 
 ## 工程原则
 

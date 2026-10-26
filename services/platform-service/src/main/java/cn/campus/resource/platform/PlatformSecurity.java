@@ -99,6 +99,7 @@ class PlatformSecurity {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.GET, "/internal/v1/rooms", "/internal/v1/rooms/**", "/internal/v1/settings")
                             .hasAuthority("SERVICE_READ")
+                        .requestMatchers(HttpMethod.GET, "/internal/v1/maintenance-staff/*").hasAuthority("SERVICE_MAINTENANCE")
                         .requestMatchers(HttpMethod.POST, "/internal/v1/checkin-codes/verify", "/internal/v1/notifications")
                             .hasAuthority("SERVICE_RESERVATION")
                         .anyRequest().denyAll())
