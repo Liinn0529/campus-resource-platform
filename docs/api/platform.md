@@ -1,6 +1,6 @@
-# 平台 API 契约（Phase 5 草稿）
+# 平台 API 契约（Phase 6 草稿）
 
-本文件描述 D 公共层的实际代码方案，完整机器契约为 [OpenAPI 3 JSON](../../contracts/openapi/platform.v1.json)。Phase 3 交付基础能力，Phase 4 增加内部房间目录及座位筛选，Phase 5 增加真实 M1 提醒接收和本人站内收件箱；真实结果以阶段验证记录为准，静态契约不能代替运行验证或人工审阅。运行信息端点另见 [runtime.md](runtime.md)。本文共列 35 个方法/路径组合。预约与实际签到由 M1 决定；审批、工单及通用远程审计写入仍留后续。
+本文件描述 D 公共层的实际代码方案，完整机器契约为 [OpenAPI 3 JSON](../../contracts/openapi/platform.v1.json)。Phase 3 交付基础能力，Phase 4 增加内部房间目录及座位筛选，Phase 5 增加真实 M1 提醒接收和本人站内收件箱；真实结果以阶段验证记录为准，静态契约不能代替运行验证或人工审阅。运行信息端点另见 [runtime.md](runtime.md)。本文共列 36 个方法/路径组合。预约与实际签到由 M1 决定；审批、工单及通用远程审计写入仍留后续。
 
 ## 地址、认证与响应
 
@@ -54,7 +54,7 @@ local seed 保持五个演示用户，不为 DEPARTMENT_ADMIN、PROPERTY_MANAGER
 | PATCH /users/{id} | displayName、enabled 中至少一项非 null → User | SYSTEM_ADMIN + user:manage |
 | PUT /users/{id}/password | `{password}` → User；重置后旧 JWT 失效 | SYSTEM_ADMIN + user:manage |
 | PUT /users/{id}/roles | `{roleCodes:[...]}` 全量替换 → User | SYSTEM_ADMIN + user:manage |
-| PUT /users/{id}/room-scopes | `{roomIds:[...]}` 全量替换 → User | SYSTEM_ADMIN + user:manage；目标用户必须有 ROOM_ADMIN 角色 |
+| PUT /users/{id}/room-scopes | `{roomIds:[...]}` 全量替换 → User | SYSTEM_ADMIN + user:manage；目标用户必须有 ROOM_ADMIN 或 DEPARTMENT_ADMIN 角色 |
 | GET /roles | `{id,code,name,permissionCodes}` 数组 | SYSTEM_ADMIN + role:manage |
 | GET /permissions | `{id,code,name}` 数组 | SYSTEM_ADMIN + role:manage |
 | PUT /roles/{code}/permissions | `{permissionCodes:[...]}` 全量替换 → Role | SYSTEM_ADMIN + role:manage；不能修改 SYSTEM_ADMIN 权限 |
@@ -142,3 +142,9 @@ FIRST 的 dueAt 必须为 startAt−15分钟、expiresAt 为 startAt+10分钟；
 M1 持久队列使用相同 sourceRefId 处理超时后回执未知和进程恢复，D 唯一约束裁决并发重复。M1 只有在验证完整匹配回执后记录 ACCEPTED；业务重试、过期、在途限制见[预约契约](reservation.md#提醒调度投递与恢复)。D 的记录不参与决定预约状态。
 
 通知与违约保存期限、删除和申诉政策仍待人工 review，当前保留不能解释为批准永久保存。当前没有通用跨服务审计写入端点；D 只为自己的真实通知接收写审计，M1 的签到/NO_SHOW 事件由其本地事务记录。
+
+## Phase 6 本人审批范围
+
+`GET /api/v1/me/room-scopes` 要求当前用户具有 `classroom:approve`，返回成功 envelope，data 为本人已授权房间 ID 升序数组；不接收其他用户ID。缺失/失效JWT为401，当前无审批权限为403，不把拒绝改成空范围。系统管理员经原管理API向 ROOM_ADMIN 或 DEPARTMENT_ADMIN 显式分配范围，移除两类角色后清除范围；同一JWT下一请求立即看到当前范围/权限。
+
+部门范围仅用于M2审批，不授予D空间维护或签到码读取；D原ROOM_ADMIN/系统管理员的资源维护规则保持。M2仍须同时验证对应阶段角色、权限和明确房间范围，不能仅凭SYSTEM_ADMIN或一个审批权限越级。部门组织模型、完整Web和M1整房间占用集成不由这个接口冒充已完成。

@@ -2367,6 +2367,54 @@
           "reservation-service"
         ]
       }
+    },
+    "/api/v1/me/room-scopes": {
+      "get": {
+        "operationId": "getOwnApprovalRoomScopes",
+        "summary": "Read current approval room scopes",
+        "tags": [
+          "Authentication"
+        ],
+        "description": "Requires the current classroom:approve permission. Returns only the authenticated user room IDs, sorted ascending. ROOM_ADMIN and DEPARTMENT_ADMIN may receive explicit scopes through system-admin management. A department scope grants approval authority only; existing resource-write rules remain unchanged.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomScopeListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3803,6 +3851,29 @@
           "data",
           "requestId"
         ]
+      },
+      "RoomScopeListResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "uniqueItems": true
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
       }
     },
     "responses": {
