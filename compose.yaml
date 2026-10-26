@@ -85,12 +85,20 @@ services:
         SERVICE_NAME: reservation-service
   classroom-service:
     <<: *backend
+    depends_on:
+      postgres: {condition: service_healthy}
+      platform-service: {condition: service_healthy}
+      reservation-service: {condition: service_healthy}
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/campus_resource?currentSchema=classroom
       DB_USERNAME: classroom_app
       DB_PASSWORD: ${CLASSROOM_DB_PASSWORD:?Run ./scripts/init-env.sh first}
       FLYWAY_USERNAME: classroom_migrator
       FLYWAY_PASSWORD: ${CLASSROOM_FLYWAY_PASSWORD:?Run ./scripts/init-env.sh first}
+      PLATFORM_BASE_URL: http://platform-service:8080
+      PLATFORM_CLASSROOM_TOKEN: ${PLATFORM_CLASSROOM_TOKEN:?Run ./scripts/init-env.sh first}
+      M1_BASE_URL: http://reservation-service:8080
+      M1_CLASSROOM_TOKEN: ${M1_CLASSROOM_TOKEN:?Run ./scripts/init-env.sh first}
     build:
       <<: *backend-build
       args:
