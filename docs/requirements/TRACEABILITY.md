@@ -1,14 +1,14 @@
-# 需求追踪矩阵（当前 Phase 5）
+# 需求追踪矩阵（当前 Phase 6）
 
 来源与需求正文见 [REQUIREMENTS.md](REQUIREMENTS.md)，原文见 [CODEX_EXECUTION_PROMPT.md](CODEX_EXECUTION_PROMPT.md)。每个需求 ID 对应一行；保留原文要求的 `ID | Requirement | Module | API/Page | Test | Status` 六列，并增加 Source、Phase。
 
-**Phase 5 功能与首次本地运行验收通过，最终干净版本重建待核对。** Phase 0–4 历史保留，本轮D V4/M1 V3增加真实房间码签到、持久站内提醒、T+15 NO_SHOW、唯一违约/精确释放；当前D35/M1 10操作，具体方案交草稿PR人工review。完整clean reactor102项、前端6项、原卷升级、网关/CORS/日志已通过；最终干净SHA/镜像核验以[Phase 5 验证](../review/phase-5-validation.md)实际记录为准；审批、工单、完整Web、M2/M3占用写接口和CI/CD仍未完成。
+**Phase6功能130项后端测试及首轮真实运行验收通过。** D36/M1 10/M2 6操作；已上传D范围与M2功能分项至[PR #7](https://github.com/Liinn0529/campus-resource-platform/pull/7)。审批/同步状态真实，当前M1缺Phase8接口的403明确记SYNC_FAILED，不假报占用；运行及最终干净SHA见[Phase6验收](../review/phase-6-validation.md)。保留186ID和15OQ，完成后等待Phase7。
 
 状态语义：TODO=尚未实现/验证；PARTIAL=部分交付且仍需验收；BLOCKED=无法继续且已记录原因；DONE=阶段适用验收完成且有真实证据。DONE 不表示人工已批准schema、合并PR或下一阶段。本轮已获真实证据的阶段项逐项晋升；正常COMPLETED、完整Web与违约保留政策仍保持PARTIAL，不把本地验证称为GitHub CI。
 
 OQ-01..15全部保留。Phase 5对签到窗口、NO_SHOW、站内入箱/恢复与最小违约可见范围给出具体草案，正常COMPLETED、保存期限、补签到、M2/M3释放和组织政策仍未定；不删除后续需求。
 
-验收证据：历史[Phase 0](../review/phase-0-validation.md)、[Phase 1](../review/phase-1-validation.md)、[Phase 2](../review/phase-2-validation.md)、[Phase 3](../review/phase-3-validation.md)、[Phase 4](../review/phase-4-validation.md)保留；当前[Phase 5计划](../plans/phase-5.md)与[本轮验收](../review/phase-5-validation.md)、[平台API](../api/platform.md)、[预约API](../api/reservation.md)及对应OpenAPI同步。本轮分支feature/phase-5-checkin基于Phase 4最终edf454a8，验证后按可运行分项上传，保持堆叠草稿人工review。
+验收证据：历史[Phase 0](../review/phase-0-validation.md)、[Phase 1](../review/phase-1-validation.md)、[Phase 2](../review/phase-2-validation.md)、[Phase 3](../review/phase-3-validation.md)、[Phase 4](../review/phase-4-validation.md)保留；历史[Phase5](../review/phase-5-validation.md)、当前[Phase6计划](../plans/phase-6.md)与[本轮验收](../review/phase-6-validation.md)、[平台API](../api/platform.md)、[预约API](../api/reservation.md)及对应OpenAPI同步。本轮分支feature/phase-6-classroom基于Phase5最终c6948c95，验证后按可运行分项上传，保持堆叠草稿人工review。
 
 ## Phase 0 文档交付
 
@@ -49,12 +49,12 @@ OQ-01..15全部保留。Phase 5对签到窗口、NO_SHOW、站内入箱/恢复�
 | REQ-ARCH-003 | 前端采用 Vue 3、TypeScript、Vite、Vue Router、Pinia、Element Plus、Axios、Vitest、Playwright。 | Web | apps/web | 已执行：Vue 栈、6 tests/lint/build；业务 Playwright 待 Phase 10 | PARTIAL | §三 | 1 起 |
 | REQ-ARCH-004 | 运维采用 Docker、Docker Compose、Nginx、GitHub Actions、华为云 SWR/ECS/RDS PostgreSQL。 | 运维 | deploy; .github/workflows | 已执行：Docker/Compose/Nginx 真实运行；Actions/华为云待后续 | PARTIAL | §三 | 1/11–14 |
 | REQ-ARCH-005 | 遵循附录 A 的目标目录；Phase 0 只建文档与空目录，pom.xml、package.json、pnpm-workspace.yaml 等工程文件留后续。 | 全局 | 仓库目录 | 已执行：本阶段构建/应用/脚本文件；后续目录仍保留占位 | PARTIAL | §四 | 0 目录; 1 起文件 |
-| REQ-ARCH-006 | 跨模块只能通过 HTTP API；业务服务通过 D 获取其拥有的身份、权限和空间主数据；M2/M3 通过 M1 创建及释放房间占用。 | D/M1/M2/M3 | M1 PlatformClient; D /me 与五个 internal 操作 | M1 真实 HTTP 获取当前身份/权限、主数据/参数，拒绝跨 schema；M2/M3 占用与其他调用方仍未实现 | PARTIAL | §一、五、六 | 0 设计; 3–8 实现 |
+| REQ-ARCH-006 | 跨模块只能通过 HTTP API；业务服务通过 D 获取其拥有的身份、权限和空间主数据；M2/M3 通过 M1 创建及释放房间占用。 | D/M1/M2/M3 | M1/M2 PlatformClient; D /me/room-scopes 与六个internal操作 | M1/M2真实HTTP获取当前身份/权限和主数据；M2本人范围与真实M1拒绝处理通过，无跨schema；真实占用/释放及M3仍待后续 | PARTIAL | §一、五、六 | 0 设计; 3–8 实现 |
 | REQ-ARCH-007 | 一个 PostgreSQL 实例包含 platform、reservation、classroom、maintenance 四个独立 schema；各服务仅拥有对应 schema。 | D/M1/M2/M3 | deploy/postgres/010-service-databases.sh; 四服务 datasource/Flyway | 已执行：真实 PostgreSQL 空库创建四 schema，各服务 V1 执行与自身 current_schema 核对 | DONE | §六 | 2 |
 | REQ-ARCH-008 | 每服务独立数据库账号且只可访问自身 schema；禁止跨 schema SQL、跨服务直接读表或写表。 | D/M1/M2/M3 | 四对 app/migrator 账号; DatabaseTestSupport | 已执行：各 app 本 schema DML；app/migrator 跨 schema 实际表读写均拒绝；app DDL/切换 owner/history 操作拒绝 | DONE | §六 | 2 |
 | REQ-ARCH-009 | 禁止无必要的 Kafka、Nacos、Consul、Service Mesh、Event Sourcing、CQRS；M2 第一版不实现 BPMN 引擎。 | 全局 | 架构与依赖 | 计划，未执行：依赖及设计审查 | TODO | §二、十三 | 0–15 |
 | REQ-ARCH-010 | 第一版不使用 Redis，也不使用 Redis lock；并发依赖 PostgreSQL room_gate 房间锁。 | 全局 | ReservationService; room_gate | M1 本地事务房间锁、首次六请求同座位竞争仅一成功；无 Redis，后续模块接入仍持续审查 | PARTIAL | §三、八 | 1–14 |
-| REQ-ARCH-011 | 不使用分布式事务；本地持久化业务状态，通过 HTTP 和有限重试显式表达同步结果。 | M2/M3/M1 | 跨服务状态流 | 计划，未执行：成功、失败及恢复测试 | TODO | §十 | 6–8 |
+| REQ-ARCH-011 | 不使用分布式事务；本地持久化业务状态，通过 HTTP 和有限重试显式表达同步结果。 | M2/M3/M1 | M2 sync state/client | M2本地持久中间态与HTTP/有限重试已验证；M3/跨模块补偿仍待后续 | PARTIAL | §十 | 6–8 |
 | REQ-ARCH-012 | ELB、CCE、DCS Redis 均为后续可选；CCE 仅 ECS+Compose 稳定后允许，不能借可选技术违反第一版不用 Redis 的约束。 | 运维 | 可选演进 ADR | 计划，未执行：演进门禁与人工范围确认 | TODO | §三、三十六 | 14 后可选 |
 
 ## 数据结构、迁移与演示数据
@@ -66,7 +66,7 @@ OQ-01..15全部保留。Phase 5对签到窗口、NO_SHOW、站内入箱/恢复�
 | REQ-DATA-003 | 建立 room_gate(room_id PRIMARY KEY)，房间级互斥所需行必须可获取。 | M1 | reservation V2 room_gate; ReservationMapper | room_id 主键；事务INSERT ON CONFLICT后FOR UPDATE，首次同房间同座位并发仅一成功，真实锁竞争测试通过 | DONE | §八 | 2/4 |
 | REQ-DATA-004 | 占用来源具有 (source_module, source_ref_id, source_type) 唯一约束。 | M1 | seat_occupancy occupancy_source_unique | V2 保留来源三元组唯一且取消不删记录、再预约新来源；M2/M3 幂等同/异载荷HTTP语义仍留Phase8 | PARTIAL | §九 | 2/8 |
 | REQ-DATA-005 | 建立 room_checkin_code，保留 room_id、date、code、created_at；每日每 room 一个码并由数据库唯一约束保证。 | D | platform V2 room_checkin_code; CommonService | 已执行：真实 PostgreSQL V2、room/date 主键、Clock 上海日界、8 位码、并发 ensure 单记录/单审计和内部验码测试通过 | DONE | §十二 | 2/3 |
-| REQ-DATA-006 | 建立 classroom_request、approval_step、approval_action、classroom_event。 | M2 | classroom schema | 计划，未执行：migration 及审批行为集成验证 | TODO | §十三 | 2/6 |
+| REQ-DATA-006 | 建立 classroom_request、approval_step、approval_action、classroom_event。 | M2 | M2 V2四表 | V2真实迁移、约束及申请/步骤/动作/事件测试通过 | DONE | §十三 | 2/6 |
 | REQ-DATA-007 | 建立 user、role、permission、user_role、role_permission，保留附录 C 的七类角色和权限示例。 | D | platform V1–V3; ManagementService; AccessPolicy | 已执行：五表/七角色/原九权限示例及 14 项目录、初始 35 关系；角色/范围管理和后端授权测试通过，方案仍待人工 review | DONE | §十五 | 2/3 |
 | REQ-DATA-008 | 各服务 migration 放在 src/main/resources/db/migration/，使用 Flyway 版本命名，schema 版本化。 | D/M1/M2/M3 | 四服务 db/migration; D V1–V3 / M1 V1–V2 / M2/M3 V1 | 真实空库 Flyway 自动发现/校验 D V1–V3 与 M1 V1–V2；已发布旧迁移保持不变 | DONE | §二十四 | 2 起 |
 | REQ-DATA-009 | migration 只向前；不修改已经执行/发布的 migration，修复新增 migration；禁止手工修改生产 schema。 | D/M1/M2/M3 | Flyway; 新 M1 V2; 生产流程 | Phase4只追加M1 V2，D V1–V3/其他V1保持不变；未来迁移与生产流程持续审查 | PARTIAL | §二、二十四 | 2 起 |
@@ -113,15 +113,15 @@ OQ-01..15全部保留。Phase 5对签到窗口、NO_SHOW、站内入箱/恢复�
 
 | ID | Requirement | Module | API/Page | Test | Status | Source | Phase |
 |---|---|---|---|---|---|---|---|
-| REQ-M2-001 | 提供整教室申请、状态查询和详情，维护申请、审批步骤、审批动作与事件记录。 | M2 | 申请 API（待定义） | 计划，未执行：提交、查询及事件记录验证 | TODO | §五.3、十三; Phase 6 | 6 |
-| REQ-M2-002 | 第一版固定审批链：普通学生提交 → ROOM_ADMIN → DEPARTMENT_ADMIN，逐级审批。 | M2 | 审批 API（待定义） | 计划，未执行：顺序、审批人角色与越级拒绝 | TODO | §十三; Phase 6 | 6 |
-| REQ-M2-003 | 支持批准及驳回，必须按当前状态和审批步骤执行后端权限校验。 | M2 | approve / reject API（待定义） | 计划，未执行：合法审批、重复审批和非法转换 | TODO | §五.3、十三; Phase 6 | 6 |
-| REQ-M2-004 | 支持申请撤销及审批超时自动撤销；超时阈值、可撤销状态和与占用释放的协调待确认。 | M2 | cancel / timeout（待定义） | 计划，未执行：撤销守卫与可控时间边界测试 | TODO | §五.3、十三; Phase 6 | 6 |
-| REQ-M2-005 | 状态完整保留 SUBMITTED、APPROVING、APPROVED_PENDING_SYNC、APPROVED、REJECTED、CANCELLED、AUTO_CANCELLED、SYNC_FAILED。 | M2 | classroom_request 状态机 | 计划，未执行：状态枚举及转换守卫测试 | TODO | §十三 | 6 |
-| REQ-M2-006 | 最终批准流程为 APPROVING → APPROVED_PENDING_SYNC → 调 M1 → APPROVED，只有 M1 真实占用成功后才能显示 APPROVED。 | M2/M1 | POST /internal/v1/room-blocks | 计划，未执行：真实 HTTP 成功路径与中间态验证 | TODO | §十 | 6/8 |
-| REQ-M2-007 | 占用同步失败保持明确中间态并按有限重试策略处理，最终失败标记 SYNC_FAILED，不默认审批成功。 | M2/M1 | 同步任务 | 计划，未执行：网络失败、5xx、4xx 和耗尽测试 | TODO | §十 | 6/8 |
-| REQ-M2-008 | 需要释放教室时调用 M1 释放契约，禁止直接删除 M1 记录；取消与正常到期释放规则待确认。 | M2/M1 | DELETE /internal/v1/room-blocks/{sourceModule}/{sourceRefId} | 计划，未执行：真实释放、重复释放及失败验证 | TODO | §五.3、九 | 6/8 |
-| REQ-M2-009 | 单元测试可以 mock M1，生产代码必须使用真实 HTTP client；单测 mock 不能当作跨模块集成证据。 | M2 | M2 HTTP client | 计划，未执行：单元边界与生产调用实现审查 | TODO | Phase 6 | 6 |
+| REQ-M2-001 | 提供整教室申请、状态查询和详情，维护申请、审批步骤、审批动作与事件记录。 | M2 | /api/v1/classroom-requests | 真实D/HTTP提交、本人/范围待办、详情一致快照及事件测试通过 | DONE | §五.3、十三; Phase 6 | 6 |
+| REQ-M2-002 | 第一版固定审批链：普通学生提交 → ROOM_ADMIN → DEPARTMENT_ADMIN，逐级审批。 | M2 | ClassroomService; D own scopes | 逐级角色/当前权限/范围、禁止自批/同人两级与即时撤权测试通过 | DONE | §十三; Phase 6 | 6 |
+| REQ-M2-003 | 支持批准及驳回，必须按当前状态和审批步骤执行后端权限校验。 | M2 | POST approve/reject | 记录锁内状态/步骤守卫、并发单决定及损坏步骤原子回滚通过 | DONE | §五.3、十三; Phase 6 | 6 |
+| REQ-M2-004 | 支持申请撤销及审批超时自动撤销；超时阈值、可撤销状态和与占用释放的协调待确认。 | M2 | POST cancel; timeout job | 仅前置审批撤销/每级24h封顶开始、锁后Clock/到期自动取消测试通过；占用后释放另属M2-008 | DONE | §五.3、十三; Phase 6 | 6 |
+| REQ-M2-005 | 状态完整保留 SUBMITTED、APPROVING、APPROVED_PENDING_SYNC、APPROVED、REJECTED、CANCELLED、AUTO_CANCELLED、SYNC_FAILED。 | M2 | classroom_request状态约束 | 保留全部8状态；当前生产同步403失败，APPROVED分支仅明确回执夹具，真实成功仍见M2-006/010 | DONE | §十三 | 6 |
+| REQ-M2-006 | 最终批准流程为 APPROVING → APPROVED_PENDING_SYNC → 调 M1 → APPROVED，只有 M1 真实占用成功后才能显示 APPROVED。 | M2/M1 | OccupancyClient; sync job | 真实HTTP/持久pending/失败及回执校验已实现；M1真实成功封房仍待Phase8，不能以夹具称完成 | PARTIAL | §十 | 6/8 |
+| REQ-M2-007 | 占用同步失败保持明确中间态并按有限重试策略处理，最终失败标记 SYNC_FAILED，不默认审批成功。 | M2/M1 | ClassroomService.syncDue | 3总尝试、30/60退避、4xx终止、lease恢复/耗尽/迟到令牌；真实M1拒绝不假成功 | DONE | §十 | 6/8 |
+| REQ-M2-008 | 需要释放教室时调用 M1 释放契约，禁止直接删除 M1 记录；取消与正常到期释放规则待确认。 | M2/M1 | post-sync cancel guard; Phase8 release | 当前禁止pending/syncfailed无确认取消；真实DELETE释放/到期补偿尚未实现 | PARTIAL | §五.3、九 | 6/8 |
+| REQ-M2-009 | 单元测试可以 mock M1，生产代码必须使用真实 HTTP client；单测 mock 不能当作跨模块集成证据。 | M2 | OccupancyClient; SynchronizationBoundaryTest | 生产真实HTTP独立凭据/禁重定向，明确夹具只测回执边界，不充当Phase8成功 | DONE | Phase 6 | 6 |
 | REQ-M2-010 | 真实验收：M2 审批成功 → HTTP M1 → 教室全部座位不可预约。 | M2/M1/Web | 审批页面 / availability | 计划，未执行：跨服务集成与 Playwright E2E | TODO | Phase 8 | 8 |
 
 ## M3 物业报修工单
@@ -145,13 +145,13 @@ OQ-01..15全部保留。Phase 5对签到窗口、NO_SHOW、站内入箱/恢复�
 
 | ID | Requirement | Module | API/Page | Test | Status | Source | Phase |
 |---|---|---|---|---|---|---|---|
-| REQ-API-001 | 公开 API 使用 /api/v1，内部 API 使用 /internal/v1，OpenAPI 3 文档随真实契约维护。 | D/M1/M2/M3 | D /api/v1 与 /internal/v1; M1 /api/v1; 两份OpenAPI | D33/M1 8操作与实际Controller同步且正式OpenAPI校验通过；其他模块契约留后续 | PARTIAL | §十七 | 1 契约; 3–8 实现 |
-| REQ-API-002 | 成功响应统一含 data、requestId；失败响应统一含 code、message、requestId，保留业务错误码。 | D/M1/M2/M3 | D/M1 ApiEnvelope/ApiErrors; X-Request-ID | D/M1真实成功/失败响应与关联ID测试通过；网关自身错误及后续模块持续维护 | PARTIAL | §十七 | 3–8 |
+| REQ-API-001 | 公开 API 使用 /api/v1，内部 API 使用 /internal/v1，OpenAPI 3 文档随真实契约维护。 | D/M1/M2/M3 | D /api/v1与/internal/v1; M1/M2 /api/v1; 三份OpenAPI | D36/M1 10/M2 6操作与实际Controller同步且正式OpenAPI校验通过；M3及M1占用写契约留后续 | PARTIAL | §十七 | 1 契约; 3–8 实现 |
+| REQ-API-002 | 成功响应统一含 data、requestId；失败响应统一含 code、message、requestId，保留业务错误码。 | D/M1/M2/M3 | D/M1/M2 ApiEnvelope/ApiErrors; X-Request-ID | D/M1/M2真实成功/失败响应与关联ID测试通过；网关自身错误及后续模块持续维护 | PARTIAL | §十七 | 3–8 |
 | REQ-API-003 | 按语义使用 200、201、204、400、401、403、404、409、422、500、503；禁止所有接口都返回 200。 | D/M1/M2/M3 | D/M1 Controller/异常/权限边界 | D/M1真实200/201/400/401/403/404/409/422/500/503语义测试通过；暂无204/硬删除，后续模块持续验证 | PARTIAL | §十七 | 3–8 |
 | REQ-API-004 | 提供 POST /internal/v1/room-blocks，请求字段 roomId、startAt、endAt、sourceModule、sourceType、sourceRefId 与附录 D 一致。 | M1/M2/M3 | POST /internal/v1/room-blocks | 计划，未执行：M2/M3 示例及非法组合契约测试 | TODO | §九 | 8 |
 | REQ-API-005 | 提供 DELETE /internal/v1/room-blocks/{sourceModule}/{sourceRefId} 释放来源占用；不得擅自更改路径解决三元唯一键歧义。 | M1/M2/M3 | DELETE /internal/v1/room-blocks/{sourceModule}/{sourceRefId} | 计划，未执行：释放目标、重复释放及歧义确认后的契约测试 | TODO | §九 | 8 |
 | REQ-API-006 | 同一来源重复请求内容一致返回已有结果，内容冲突返回 409 Conflict；不能产生重复占用。 | M1/M2/M3 | room-blocks API | 计划，未执行：同键同载荷、同键异载荷及并发重复测试 | TODO | §九 | 8 |
-| REQ-API-007 | 只重试网络错误和 5xx，不重试 4xx，最多 3 次，超出进入 SYNC_FAILED；“3 次”计数口径待确认。 | M2/M3/M1 | HTTP client / 同步任务 | 计划，未执行：错误类别、次数上限与持久状态验证 | TODO | §十 | 6–8 |
+| REQ-API-007 | 只重试网络错误和 5xx，不重试 4xx，最多 3 次，超出进入 SYNC_FAILED；“3 次”计数口径待确认。 | M2/M3/M1 | M2 bounded sync | M2最多3次总尝试、只网络/5xx重试，4xx终止与持久恢复通过；M3仍待后续 | PARTIAL | §十 | 6–8 |
 | REQ-API-008 | API、HTTP client 和前端数据必须来自真实业务实现，公共契约更新后经人工审查并同步文档。 | D/M1/M2/M3 | D/M1 API/OpenAPI; PlatformClient; 草稿PR | D/M1真实MyBatis/HTTP，75项后端测试通过，两份契约同步；草稿PR待人工review，业务Web及M2/M3留后续 | PARTIAL | §一、十七、三十九 | 3–15 |
 
 ## 认证、授权和安全边界
@@ -270,7 +270,7 @@ OQ-01..15全部保留。Phase 5对签到窗口、NO_SHOW、站内入箱/恢复�
 | REQ-PH-003 | 实现 login、RBAC、user、role、permission、building、room、seat、settings、checkin code、audit；管理员能维护空间，学生无管理权限，后端 RBAC 生效。 | D | D 32 操作; V2/V3; OpenAPI/运行脚本 | 已执行：后端 49 项/前端 6 项及 lint/类型检查/build 通过；保留原卷 V1→V3、七容器 healthy、真实五用户登录/管理员空间与参数/范围内房管/日码/审计/学生拒绝/内部隐藏及恢复检查全部通过 | DONE | Phase 3 | 3 |
 | REQ-PH-004 | 实现房间/座位/可用性查询、创建、取消、历史、再预约、room_gate、seat_occupancy；验收不能重复预约、默认 4 小时、插座过滤、历史再预约。 | M1 | M1 V2/8 API; OpenAPI; 运行脚本 | 75项后端/前端6项与构建通过；保留原卷M1 V1→V2、七容器、网关公共层回归与预约/冲突/插座/取消/历史再预约、隔离/账本和数据保留检查通过；最终干净版本重建另记 | DONE | Phase 4 | 4 |
 | REQ-PH-005 | 实现签到、T−15/T+10 提醒、T+15 NO_SHOW、违约和占用释放，使用可注入 Clock。 | M1/D | M1生命周期; D站内收件箱; V3/V4 | 完整clean reactor102项、前端6项、保留原卷D4/M1 V3升级及网关检查通过；最终干净SHA另核对，结束等待Phase6 | DONE | Phase 5 | 5 |
-| REQ-PH-006 | 实现 submit、approval、approve、reject、cancel、timeout；单元测试可 mock M1，生产必须真实 HTTP client。 | M2 | M2 | 计划，未执行：状态机及 HTTP client 验收 | TODO | Phase 6 | 6 |
+| REQ-PH-006 | 实现 submit、approval、approve、reject、cancel、timeout；单元测试可 mock M1，生产必须真实 HTTP client。 | M2 | M2六操作/真实D/M1客户端 | 130测试及首轮保留卷/真实两级审批验收通过，分项已上传；最终SHA重建结果另见仓库外交付报告 | DONE | Phase 6 | 6 |
 | REQ-PH-007 | 实现 report、assign、start、finish、accept、cancel、review、escalate，并满足 §十四 rejectAcceptance 要求。 | M3 | M3 | 计划，未执行：工单完整流程与超时验收 | TODO | Phase 7 | 7 |
 | REQ-PH-008 | 连接 M2→M1、M3→M1，删除生产 mock；以真实审批占用及维修下架/验收恢复 E2E 验收。 | M2/M3/M1 | 跨模块集成 | 计划，未执行：两条真实跨模块流程 | TODO | Phase 8 | 8 |
 | REQ-PH-009 | 完成 student、approval、maintenance、admin 前端流程，主要业务无需 Postman。 | Web | apps/web | 计划，未执行：全角色 Web 人工验收 | TODO | Phase 9 | 9 |
@@ -284,8 +284,10 @@ OQ-01..15全部保留。Phase 5对签到窗口、NO_SHOW、站内入箱/恢复�
 ## 基线统计与更新规则
 
 - 需求总数：186。
-- 当前状态：DONE 48；TODO 104；PARTIAL 34；BLOCKED 0。
+- 当前状态：DONE 57；TODO 91；PARTIAL 38；BLOCKED 0。
 - 分类计数：REQ-P0: 8, REQ-GOV: 12, REQ-ARCH: 12, REQ-DATA: 12, REQ-D: 8, REQ-M1: 17, REQ-M2: 10, REQ-M3: 12, REQ-API: 8, REQ-SEC: 12, REQ-ENG: 9, REQ-UI: 9, REQ-TEST: 12, REQ-OPS: 16, REQ-AGENT: 7, REQ-ETH: 7, REQ-PH: 15。
 - API/Page 和 Test 的计划内容须在对应阶段替换/补充为真实契约、代码/测试路径和执行证据；保留源要求与稳定 ID。
 - 标记 DONE 前，检查源 §三十九 DoD 和本阶段适用范围，更新实际验收记录；不得把计划测试名称、文档审阅或工具退出码冒充业务测试通过。
-- Phase 0–4保留为历史基线；当前仅Phase 5获授权，完成后停止等待Phase 6。未完成的正常COMPLETED、完整Web、M2/M3和CI/CD需求继续保留，不以模型/文档代替验收。
+- Phase 0–4保留为历史基线；当前仅Phase6获授权，完成后停止等待Phase7。未完成的正常COMPLETED、完整Web、M3、真实M1封房/释放和CI/CD需求继续保留，不以模型/文档代替验收。
+
+本轮真实封房/释放依赖继续保留M2-006/008为PARTIAL、M2-010为TODO；不提前执行Phase8。阶段本地功能完成后才逐项晋升，GitHub CI仍未配置。

@@ -2,11 +2,11 @@
 
 - 状态：**Proposed / 待人工 Review**
 - 日期：2026-10-20
-- 阶段：Phase 0 起草；Phase 2/3/4/5 补充实施范围
+- 阶段：Phase 0 起草；Phase 2/3/4/5/6补充实施范围
 - 决策来源：[CODEX_EXECUTION_PROMPT.md](../requirements/CODEX_EXECUTION_PROMPT.md)第 4–10、16–18、24、29–37 节
 - 关联：[ARCHITECTURE.md](../architecture/ARCHITECTURE.md)、[DATA_OWNERSHIP.md](../architecture/DATA_OWNERSHIP.md)、[REQUIREMENTS.md](../requirements/REQUIREMENTS.md)、[TRACEABILITY.md](../requirements/TRACEABILITY.md)
 
-本 ADR 记录源文档指定的边界，Proposed 表示尚待人工 review，阶段执行或上传代码不自动批准架构。Phase 0–4 已交付并保留历史证据；本轮 Phase 5 追加 D V4 持久站内收件箱、M1 V3 签到/提醒/违约，35/10 个操作及具体时间、恢复和可见范围草案正在真实验证。当前结果见[Phase 5 验证](../review/phase-5-validation.md)，不预填测试或 Compose 成功。M2/M3、完整 Web、CI/CD 和部署留后续。
+本 ADR 记录源文档指定的边界，Proposed 表示尚待人工 review，阶段执行或上传代码不自动批准架构。Phase0–5已交付并保留历史证据；本轮Phase6追加M2 V2申请审批与持久同步、D本人审批范围，36/10/6操作。130项及首轮真实运行通过，记录见[Phase6验证](../review/phase-6-validation.md)。M3、M1占用集成、完整Web、CI/CD和部署留后续。
 
 ## 背景
 
@@ -21,7 +21,7 @@
 3. **M2/M3 保持独立业务责任。** `classroom-service` 拥有申请审批和对应事件，`maintenance-service` 拥有工单维修验收和对应事件；它们通过 M1 内部 HTTP API 创建、释放房间占用。
 4. **单实例不等于共享访问。** 四服务分别使用 `platform`、`reservation`、`classroom`、`maintenance` schema，各有独立 app 与 migrator 账号，仅能访问本 schema。迁移账号拥有本 schema，应用账号无 DDL 或 Flyway 历史表访问权限。禁止跨 schema SQL、跨服务直接读写表和跨服务外键；跨服务实体仅以逻辑 ID 引用，通过 HTTP 校验和使用数据。
 5. **M1 以房间为事务互斥单元。** 所有影响房间座位状态的操作，在 M1 本地事务中锁定 `room_gate` 对应行，再检查并改变占用。创建/取消座位预约、创建/释放教室占用、创建/释放维修占用都遵守同一规则，不引入 Redis 锁。
-6. **跨服务采用显式同步状态与有界重试。** M2 经 `APPROVED_PENDING_SYNC` 才到 `APPROVED`；M3 经 `BLOCKING_ROOM` 才到 `IN_PROGRESS`。仅网络错误和 5xx 可重试，4xx 不重试；次数上限遵守源要求“最多 3 次”，计数含义待确认，耗尽进入 `SYNC_FAILED`。不用分布式事务掩盖部分成功。
+6. **跨服务采用显式同步状态与有界重试。** M2 经 `APPROVED_PENDING_SYNC` 才到 `APPROVED`；M3 经 `BLOCKING_ROOM` 才到 `IN_PROGRESS`。仅网络错误和 5xx 可重试，4xx 不重试；Phase6具体草案为最多3次总尝试、30/60秒退避，仍待人工review，耗尽进入 `SYNC_FAILED`。不用分布式事务掩盖部分成功。
 7. **占用创建有幂等身份。** 唯一键为 `(source_module, source_ref_id, source_type)`，一致请求返回已有结果，冲突内容返回 409。源指定 DELETE 路径缺少 `sourceType`，须人工 Review 解决后才固化释放实现，不在本 ADR 暗自修改契约。
 8. **业务判定留在确定性后端。** 权限由后端校验，认证采用密码/BCrypt/JWT；第一版不接学校统一身份认证。后续可选 Agent 只能调用公开业务 API，不直连数据库或决定审批、权限、预约、座位与工单状态。
 
@@ -57,9 +57,19 @@
 | 释放契约 | DELETE 两段标识如何唯一对应三元键；重复释放、内容冲突、引用重用与释放失败状态 |
 | 重试语义 | “最多 3 次”包含首次调用与否、调度间隔、持久化恢复、4xx 的最终处理及人工恢复入口 |
 | 资源生命周期 | D 资源创建/停用/删除与 M1 `room_gate`、已存在预约和占用之间的协调 |
-| 时间与业务政策 | Phase 4 的显式时区/整点、半开区间、当前参数、开始前取消/历史再预约已有待审方案；Phase 5 签到窗口、NO_SHOW、站内通知已有具体草案；正常完成、审批/维修超时仍未定 |
+| 时间与业务政策 | Phase 4 的显式时区/整点、半开区间、当前参数、开始前取消/历史再预约已有待审方案；Phase 5 签到窗口、NO_SHOW、站内通知已有具体草案；Phase6审批每级默认24小时并封顶开始形成待审草案；正常完成/维修超时仍未定 |
 | 安全和数据最小化 | Phase 3 的 D JWT/独立内部凭据/房间范围已有具体待审方案；其他模块接入、部门范围、站内通知已有持久接收/有界失败恢复草案；通用跨服务审计与保留/删除周期仍待明确 |
 
 Phase 0 的历史验收为文档存在、需求可追踪、边界有文字说明、未提前实现业务；Phase 1 已有运行端点和容器验收记录。Phase 2 使用真实 PostgreSQL/Testcontainers 验证迁移、schema 权限隔离、最小 seed 及幂等。Phase 3 的 49 项后端测试和实际 Compose/HTTP 验收覆盖 D 身份权限、范围、日码及审计；Phase 4 真实 D JAR/HTTP 与 PostgreSQL 已验证 M1 首次锁行竞争、同座位仅一成功、取消/再预约、权限和三来源/开放结束冲突；不替代 M2/M3 到 M1 的占用写接口/幂等业务 E2E 或生产部署验证。
 
-人工 Review 通过后方可记录 ADR 接受状态；本轮 Phase 5 完成后须停止，等待用户明确确认再进入 Phase 6。文档的 Proposed 状态不能被阶段执行授权、测试通过、Git 提交或上传仓库自动替代。
+人工 Review 通过后方可记录 ADR 接受状态；本轮Phase6完成后须停止，等待用户明确确认再进入Phase7。文档的 Proposed 状态不能被阶段执行授权、测试通过、Git 提交或上传仓库自动替代。
+
+## Phase 6 当前实现与明确依赖
+
+M2追加V2四表classroom_request、approval_step、approval_action、classroom_event；D仍V4/M1 V3/M3 V1，旧迁移不改写。D36/M1 10/M2 6操作。D本人room-scopes要求当前classroom:approve，ROOM_ADMIN/DEPARTMENT_ADMIN可显式分配房间；两角色均移除则清除范围，D空间维护仍按原ROOM_ADMIN/系统管理员规则，部门范围不扩大空间或取码权限。不新增部门模型或seed用户。
+
+M2通过真实D HTTP验证身份/权限/范围和启用CLASSROOM，无D签名秘密/跨schema SQL。SUBMITTED等待ROOM_ADMIN，第一次批准APPROVING激活DEPARTMENT_ADMIN，第二次仅APPROVED_PENDING_SYNC。两级要求当前对应角色/权限/范围，禁止自批及同一人两级，无SYSTEM_ADMIN隐式覆盖。每级激活默认24小时并封顶startAt，记录锁后复核Clock；未完成审批到期AUTO_CANCELLED。只允许本人取消SUBMITTED/APPROVING且期限前。
+
+同步通过独立M1_CLASSROOM_TOKEN真实POST M1 room-blocks，来源classroom-request:ID；30秒持久lease/令牌、3次总尝试、网络/5xx退避30/60秒、4xx/坏回执终止。两个30秒任务/池2，HTTP不持本地锁，迟到回执核对状态/令牌。当前真实M1接口属于Phase8尚未提供，直接403正确记SYNC_FAILED，不制造APPROVED或M1占用。客户端成功回执分支仅由明确外部响应夹具验证；批准后取消/到期释放/未知提交补偿与真实封房仍留Phase8。
+
+完整clean reactor130项通过，运行升级与最终SHA证据见[Phase6验收](../review/phase-6-validation.md)。早期Phase0–5文字保留历史，不能把旧阶段未实现描述当作当前M2不存在，也不能把当前M2审批当作Phase8已完成。Phase6结束等待Phase7，完整Web在Phase9。
