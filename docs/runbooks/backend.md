@@ -1,4 +1,4 @@
-# 后端运行、公共层与基础预约验证
+# 后端运行、预约与签到提醒验证
 
 需要 Docker、Git 和 OpenSSL；API 检查另需 Python 3.9+。在仓库根目录执行：
 
@@ -6,9 +6,9 @@
 ./scripts/test-backend.sh
 ```
 
-脚本使用 Maven 3.9.11 / Java 21 容器，注入当前真实 Git SHA、dirty 标记和 UTC 时间，执行四模块 `mvn verify`。测试通过 Testcontainers 启动真实 PostgreSQL 16，运行同一份数据库 bootstrap 和 Flyway，并经随机端口 Tomcat 发送 HTTP；不 mock 被测业务。Docker 不可用时检查失败，不以跳过测试获取成功。每模块生成可执行 JAR、Surefire 和 JaCoCo 报告，均被 Git 忽略。Phase 4 当前 75 项后端测试通过（完整 reactor 69 项后新增 6 项客户端边界，M1 最终子集 28 项），数量和结果以当次 Surefire 报告为准。M1 业务测试启动已打包的真实 D JAR 子进程和真实 PostgreSQL；单独运行 M1 前须先用完整 reactor 生成 D JAR，不以缺失依赖跳过测试。
+脚本使用 Maven 3.9.11 / Java 21 容器，注入真实 Git SHA、dirty 标记与 UTC 时间，执行四模块 `mvn clean verify`。测试通过 Testcontainers PostgreSQL、真实 bootstrap/Flyway 和随机端口 HTTP，不 mock 被测业务；Docker 不可用即失败。M1 集成启动已打包真实 D JAR，单独运行 M1 前先完整 reactor 生成该 JAR。Phase 4 历史为75项通过，本轮 Phase 5 clean reactor 102项通过（D43/M1 49/M2与M3各5），零失败/错误/跳过；首次运行验证通过，最终干净SHA另核对，当前数量/失败/修复及最终结果以[本轮验收](../review/phase-5-validation.md)和实际 Surefire 为准。
 
-Docker socket 默认挂载 `/var/run/docker.sock`；自定义安装可设置 `TESTCONTAINERS_SOCKET_PATH`。测试覆盖数据库账号隔离、迁移历史与审计保护、精确 local seed、非 local 无演示数据，以及登录/JWT、实时权限、房间范围、最后系统管理员保护、主数据修改和每日签到码；M1 新增整点/参数、同座位首次并发、相邻区间、多来源/开放结束冲突、本人隔离、取消/再预约和账本回滚。已发布迁移不改写：公共层使用 V1–V3、预约服务使用 V1–V2，M2/M3 为 V1。
+Docker socket 默认挂载 `/var/run/docker.sock`；自定义安装可设置 `TESTCONTAINERS_SOCKET_PATH`。测试覆盖数据库账号隔离、迁移历史与审计保护、精确 local seed、非 local 无演示数据，以及登录/JWT、实时权限、房间范围、最后系统管理员保护、主数据修改和每日签到码；M1 新增整点/参数、同座位首次并发、相邻区间、多来源/开放结束冲突、本人隔离、取消/再预约和账本回滚。已发布迁移不改写：公共层本轮追加 V4、预约服务追加 V3，已发布 D V1–V3/M1 V1–V2 不变，M2/M3 为 V1。
 
 ## 启动服务
 
@@ -40,13 +40,13 @@ python3 scripts/smoke-phase-3.py --expected-commit "$(git rev-parse HEAD)"
 
 管理和读取的具体方法、请求字段、错误码见[平台 API](../api/platform.md)与 [OpenAPI JSON](../../contracts/openapi/platform.v1.json)。系统管理员管理用户/角色、全局空间、参数和审计；房间管理员只能维护明确授权房间及其座位、读取对应签到码，无范围默认拒绝。学生可以读取启用空间和本人身份，不能通过直接调用 API 绕过管理限制。当前没有业务管理页面，不以隐藏前端按钮作为权限控制。
 
-不提供用户或空间硬删除。用户可停用，空间可修改启用状态；涉及未来预约和历史引用的删除/停用协调属于后续阶段。通知投递、实际签到、M2 审批和 M3 工单尚未实现。M1 基础预约见下节。
+不提供用户或空间硬删除。用户可停用，空间可修改启用状态；涉及未来预约和历史引用的删除/停用协调属于后续阶段。Phase 5 的真实签到与站内提醒见后文；M2 审批、M3 工单、邮件渠道和完整业务 Web 尚未实现。
 
 ## M1 基础预约 API
 
-M1 公开目录为 `/api/v1/reservation/rooms`，预约为 `/api/v1/reservations`，8 个操作与字段见[预约契约](../api/reservation.md)和 [OpenAPI](../../contracts/openapi/reservation.v1.json)。请求使用 D 登录签发的用户 JWT；M1 每次转发到 D `/api/v1/me` 读取当前身份及权限，目录/参数另用专属服务凭据读取。M1 只持有 `PLATFORM_BASE_URL`、`PLATFORM_RESERVATION_TOKEN` 与 `CAMPUS_BUSINESS_ZONE`，不共享 D 的 JWT 签名秘密。Compose 自动配置内部 D origin 和健康依赖；D 超时、故障或无效响应返回 503。
+M1 公开目录为 `/api/v1/reservation/rooms`，预约为 `/api/v1/reservations`，基础8操作及本轮签到/本人违约2操作的字段见[预约契约](../api/reservation.md)和 [OpenAPI](../../contracts/openapi/reservation.v1.json)。请求使用 D 登录签发的用户 JWT；M1 每次转发到 D `/api/v1/me` 读取当前身份及权限，目录/参数另用专属服务凭据读取。M1 只持有 `PLATFORM_BASE_URL`、`PLATFORM_RESERVATION_TOKEN` 与 `CAMPUS_BUSINESS_ZONE`，不共享 D 的 JWT 签名秘密。Compose 自动配置内部 D origin 和健康依赖；D 超时、故障或无效响应返回 503。
 
-请求时间必须带 offset，在配置业务时区符合整点，区间使用 `[start,end)`。新建和再预约读取本次 D 最大时长（默认 4 小时），开始不能在过去；本人 CREATED 预约仅开始前可取消，重复取消返回原结果。其他人的预约对任何角色均为 404，系统管理员没有代订/代取消覆盖。历史再预约保留原记录并新建来源；未来自动完成、签到和违约尚未实现。
+请求时间必须带 offset，在配置业务时区符合整点，区间使用 `[start,end)`。新建和再预约读取本次 D 最大时长（默认 4 小时），开始不能在过去；本人 CREATED 预约仅开始前可取消，重复取消返回原结果。其他人的预约对任何角色均为 404，系统管理员没有代订/代取消覆盖。历史再预约保留原记录并新建来源；正常自动完成仍未定，本轮签到和违约见下节。
 
 ```sh
 python3 scripts/smoke-phase-4.py --expected-commit "$(git rev-parse HEAD)"
@@ -54,11 +54,25 @@ python3 scripts/smoke-phase-4.py --expected-commit "$(git rev-parse HEAD)"
 
 该脚本先执行 Phase 3 回归，再通过真实网关验证目录/插座、创建、409 冲突、5 小时拒绝、学生/管理角色隔离、取消释放和新 ID 再预约。它最后取消本次创建的全部预约，保留真实 CANCELLED 历史、占用释放和事件，不插入额外 seed 或删除业务历史。`--evidence <path>` 可保存不含凭据的证据 JSON；失败退出非零。M2/M3 来源冲突目前仅由真实隔离数据库夹具验证，不能据此称 room-blocks HTTP 集成已完成。
 
+## Phase 5 签到、提醒与违约
+
+`POST /api/v1/reservations/{id}/checkin` 输入8位房间当日码，使用本人现有 `reservation:create` 权限。窗口 `[T−15min,T+15min)`，真实 D HTTP 验码后在 room_gate→预约锁内复核时间/状态；已签到幂等返回，码不保存到 M1 或日志。到 T+15 仍 CREATED 的预约由扫描写 NO_SHOW、唯一违约/系统事件并精确释放 M1 来源；失败同事务回滚。`GET /api/v1/violations` 与 D `GET /api/v1/notifications` 均仅本人，分别使用 `reservation:view:self`，管理员不能借此查看其他用户。
+
+M1 持久提醒/outbox 状态为 PENDING/SENDING/ACCEPTED/EXPIRED/FAILED，D 幂等站内接收成功后保存通知ID与时间。ACCEPTED 只表示持久入箱，不是邮件送达或已读。默认独立扫描/发送任务各30秒、批量100，调度池2；30秒claim lease，最多3次总尝试，网络/5xx退避30/60秒，4xx/无效响应不重试。首轮有效 `[T−15,T+10)`、次轮 `[T+10,T+15)`；停机恢复跳过失效提醒，先处理已截止 NO_SHOW。签到/取消抑制待发项，已在途请求不能跨服务原子撤回。
+
+调度默认启用。隔离测试以 `campus.reservation.scheduler-enabled=false` 禁用后台抢跑，直接调用注入 Clock 的真实生命周期服务验证全部节点；无生产 HTTP 调时/强制扫描端点。运行频率由 `campus.reservation.scan-delay-ms` 配置，默认30000；调度线程池为2。生产系统时钟不因测试需要被修改。
+
+```sh
+python3 scripts/smoke-phase-5.py --expected-commit "$(git rev-parse HEAD)"
+```
+
+当前实现与首次运行脚本验收通过，实际执行结果由[Phase 5 记录](../review/phase-5-validation.md)登记。固定时点和恢复/并发测试使用可注入 Clock 与真实 D/PostgreSQL，不依赖等候15分钟；实际开发卷 smoke 只验证当前真实时刻适用流程，不通过手改生产预约时间冒充调度验收。正常 COMPLETED、补签到、处罚和保留期限不擅自补全；完整 Web/E2E 留 Phase 9/10。
+
 ## 数据库与运行端点检查
 
 ```sh
-python3 scripts/check-database.py --phase4
+python3 scripts/check-database.py --phase5
 python3 scripts/smoke-phase-1.py --platform-api --expected-commit "$(git rev-parse HEAD)"
 ```
 
-数据库脚本针对当前 Compose 库检查八个 TCP 身份、schema owner、D V3/M1 V2/其他 V1、DDL/历史限制、演示基线及预约/占用/事件一致性；具体参数见脚本 `--help`。运行脚本核对七容器健康、真实 SHA/时间、只读运行接口、隐藏路径及 Web 资源，不等同于全部业务验收。结果另记于阶段验证报告，不由运行手册预先宣称。
+数据库脚本针对当前 Compose 库检查八个 TCP 身份、schema owner、D V4/M1 V3/其他 V1、DDL/历史限制、演示基线及预约/占用/事件一致性；具体参数见脚本 `--help`。运行脚本核对七容器健康、真实 SHA/时间、只读运行接口、隐藏路径及 Web 资源，不等同于全部业务验收。结果另记于阶段验证报告，不由运行手册预先宣称。

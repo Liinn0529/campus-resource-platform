@@ -1,6 +1,6 @@
 # 数据所有权与一致性边界
 
-状态：Phase 4 M1 基础预约实现方案，schema/契约仍待草稿 PR 人工 Review。Phase 2/3 的四 schema、八账号、D V1–V3 与最小 seed 保留；本轮 M1 新增 V2 四张业务表、8 个公开操作，D 增加内部房间列表至 33 个操作。75 个后端测试通过（完整 reactor 69 项后新增 6 项边界，M1 最终子集 28 项）；首次 Compose 保留原卷升级、七容器健康、真实网关流程与数据库/密码保留验证通过，最终干净版本重建仍按 [Phase 4 验证](../review/phase-4-validation.md)另记，不预填。完成后停止等待 Phase 5。具体 API 见[平台](../api/platform.md)与[预约](../api/reservation.md)契约，测试通过不表示人工已批准 schema 或进入下一阶段。
+状态：Phase 5 签到、提醒与违约实现与首次验证通过，schema/契约仍待人工 review。D 新增 V4 notification，M1 新增 V3 checkin/violation/reminder，保留已发布迁移、四 schema/八账号与最小 seed；D 35/M1 10 个操作的实际测试、Compose 升级和最终版本结果按[Phase 5 验证](../review/phase-5-validation.md)记录，不预填。完成后停止等待 Phase 6；API 见[平台](../api/platform.md)和[预约](../api/reservation.md)。
 
 依据：[原始执行要求](../requirements/CODEX_EXECUTION_PROMPT.md)第 5–16、24、27、29 节。配套：[架构](ARCHITECTURE.md)、[ADR-001](../adr/ADR-001-service-boundary.md)、[需求](../requirements/REQUIREMENTS.md)、[追踪表](../requirements/TRACEABILITY.md)。
 
@@ -8,7 +8,7 @@
 
 | 服务 | 模块 | 唯一可访问 schema | 所有权 |
 |---|---|---|---|
-| `platform-service` | D | `platform` | 身份与权限、空间主数据、系统参数、签到码、公共操作审计；通知接口归 D，是否持久化通知记录待设计 |
+| `platform-service` | D | `platform` | 身份与权限、空间主数据、系统参数、签到码、公共操作审计与持久站内通知收件箱 |
 | `reservation-service` | M1 | `reservation` | 预约、占用、房间锁、签到结果、违约及预约事件 |
 | `classroom-service` | M2 | `classroom` | 整教室申请、审批步骤、审批行为、申请事件及同步状态 |
 | `maintenance-service` | M3 | `maintenance` | 工单、派单/维修/验收/评价行为、超时升级事件及同步状态；源未指定具体表名 |
@@ -45,28 +45,30 @@ Phase 2 由 [PostgreSQL 空库引导脚本](../../deploy/postgres/010-service-da
 | `platform.user_room_scope` | V2 `(user_id,room_id)` 复合主键，均为 D 外键；管理接口只向 ROOM_ADMIN 分配，无隐式范围 |
 | `platform.system_setting` | V2 key 主键、正整数 value；V3 默认 max_reservation_hours=4 |
 | `platform.room_checkin_code` | V2 `(room_id,date)` 主键、D room 外键、8 位安全字符约束、created_at；code 不要求全局唯一 |
-| `platform.audit_log` | V2 identity 主键、同 D actor 用户引用、来源/动作/目标 ID、UUID request_id、时间；app 只新增/查询，不可更新或删除 |
+| `platform.audit_log` | V2 identity 主键、同 D actor 用户引用、来源/动作/目标 ID、UUID request_id、时间；app 只新增/查询，不可更新或删除；内部提醒接收使用空 actor、来源 reservation-service |
+| `platform.notification` | V4 持久站内收件箱；D user 为本 schema 外键，房间/预约为逻辑 ID；M1 来源键唯一，类型/时间窗口约束；不保存任意消息正文或已读/邮件状态 |
 
 基础实体 id 由数据库 identity 生成，关联通过同 schema 外键约束；local seed 不指定 id、不重置序列。Phase 3 的真实 MyBatis/HTTP 实现包括登录、JWT、后端 RBAC、用户/角色管理及空间维护，后端真实测试与 Compose 原库升级/实际 API 验收已通过；具体行为证据来自测试和运行检查，不能以表/端点存在替代验收。SYSTEM_ADMIN 管理全局 D，ROOM_ADMIN 只能维护显式范围内房间/座位和对应签到码，默认无范围。角色权限与范围从当前 DB 读取；全局管理还要求 SYSTEM_ADMIN 身份，移除/停用最后一名启用系统管理员被拒绝。
 
-D 已在 V2 建立 `room_checkin_code(room_id,date,code,created_at)`。当前草案以注入 Clock 和显式 ZoneId 计算今日，local 使用 Asia/Shanghai，生成 8 位 SecureRandom 字符，并以 (room_id,date) 主键及 room 行锁保证每日/并发 ensure 同条且只记一次创建审计。GET 只读已有今日记录；POST ensure 首次/重复均为 200，不提供当日轮换或全局 code 唯一。SYSTEM_ADMIN 或已授权房间的 ROOM_ADMIN 可取码，学生不可读码；停用房间不能生成或校验有效码。时区/码规则为待人工 review 的具体方案，QR 载荷、实际预约签到窗口和补签到仍留 Phase 5；明文码不写入日志或审计。
+D 已在 V2 建立 `room_checkin_code(room_id,date,code,created_at)`。当前草案以注入 Clock 和显式 ZoneId 计算今日，local 使用 Asia/Shanghai，生成 8 位 SecureRandom 字符，并以 (room_id,date) 主键及 room 行锁保证每日/并发 ensure 同条且只记一次创建审计。GET 只读已有今日记录；POST ensure 首次/重复均为 200，不提供当日轮换或全局 code 唯一。SYSTEM_ADMIN 或已授权房间的 ROOM_ADMIN 可取码，学生不可读码；停用房间不能生成或校验有效码。时区/码规则为待人工 review 的具体方案，QR 载荷和补签到仍未实现；Phase 5 的本人签到窗口形成 `[T−15,T+15)` 待审草案；明文码不写入日志或审计。
 
-D 现提供内部房间列表、room/seat 主数据、settings 读取和 checkin-codes/verify 共五个操作；座位读取增加 enabledOnly/hasPowerOutlet/seatId，过滤在 D SQL 分页前执行。三调用方使用各自独立 opaque 凭据，只有 reservation-service 可验码，用户 JWT 不能冒充内部身份，Nginx 不公开 internal。M1 本轮真实通过 HTTP 转发用户 JWT 到 D `/api/v1/me` 验证当前身份/权限，另用自身服务凭据获取元数据与参数；不共享 JWT 签名秘密、不读 D 表。最大时长每次新建/再预约读取当前正整数快照（初始 4），不追溯改写原预约；实际签到仍留 Phase 5。
+D 内部六个操作为房间列表、房间/座位读取、参数、当日码验证及通知接收；三个调用方凭据分离，仅 M1 可验码和写提醒。M1 每次经真实 D `/api/v1/me` 取得当前身份，另用专属凭据获取资源/参数、验码、发送提醒，不持有 D 签名秘密或读 D 表。D notification 以 `(source_module,source_ref_id)` 去重，来源由内部 M1 身份决定；首次201、相同200、冲突409，接收与审计同事务。只有当前用户可读取本人收件箱，SYSTEM_ADMIN 无跨用户覆盖；ACCEPTED 表示持久接收，不是邮件送达或已读。
 
 M2/M3 对房间不可用的影响不能通过修改 D 的座位主数据代替占用记录。D 对房间/座位的维护与占用的关系，尤其是有未来预约时停用或删除资源的处理，必须在实现前明确。
 
 ## 3. M1：占用与房间并发控制的唯一所有者
 
-Phase 2 的 `reservation` V1 只建立迁移版本/权限基线。本轮追加 [V2](../../services/reservation-service/src/main/resources/db/migration/V2__reservation_workflow.sql)，创建 room_gate、seat_reservation、seat_occupancy、reservation_event；checkin/violation 留 Phase 5。所有 D 用户/房间/座位均为逻辑 ID，仅 rebook_of 和事件到预约使用 M1 自身外键。预约约束保留五种源状态，本轮只产生 CREATED/CANCELLED，禁止用时间流逝提前写 COMPLETED/NO_SHOW。
+Phase 2 的 reservation V1 为权限基线，Phase 4 V2 创建 room_gate、seat_reservation、seat_occupancy、reservation_event。本轮 [V3](../../services/reservation-service/src/main/resources/db/migration/V3__checkin_reminders_and_no_show.sql)增加 checkin、violation、reminder；用户/房间/座位仍为逻辑 ID，同服务预约关联为本 schema 外键。五个预约状态保留，本轮增加 CHECKED_IN/NO_SHOW 转换，不擅自实现正常 COMPLETED 自动转换。
 
 | 源指定实体 | 责任 |
 |---|---|
 | `room_gate` | 每房间一条互斥控制记录，`room_id` 为主键；归 M1，不属于 D |
 | `seat_reservation` | 预约业务记录和 `CREATED/CANCELLED/CHECKED_IN/NO_SHOW/COMPLETED` 状态 |
 | `seat_occupancy` | 统一记录来自 M1/M2/M3 的占用、时间及释放信息 |
-| `checkin` | 与预约相关的签到结果 |
-| `violation` | 未按规则签到等源指定违约记录 |
-| `reservation_event` | 预约事件；与 D 操作审计分别归属，不以共享表替代 |
+| `checkin` | V3 每预约唯一，保存本人逻辑 ID 和签到时刻，不保存明文码 |
+| `violation` | V3 每预约唯一 NO_SHOW 违约，保存本人逻辑 ID/原因/时间，公开查询仅本人最小字段，不包含处罚 |
+| `reservation_event` | 预约事件；与预约/账本同事务；CHECKED_IN 为用户事件，NO_SHOW 的 actor 为空，UUID 关联系统执行 |
+| `reminder` | V3 M1 outbox，预约/类型唯一，due/expires/状态、尝试次数、claim token/lease、下次时间、D 接收 ID 与时间；不代替 D 收件箱 |
 
 `seat_occupancy` 保留以下全部 11 个源指定字段，具体类型/约束见 V2：
 
@@ -126,17 +128,19 @@ M2/M3 只能通过 `POST /internal/v1/room-blocks` 和 `DELETE /internal/v1/room
 | Web | 各模块公开业务数据 | 对应后端服务 | 公开 API，无数据库访问权 |
 | 可选 Agent | 源指定业务操作 | 对应后端服务 | 公开 API，继承真实用户权限，不直连数据库 |
 
-本矩阵保留目标责任边界。Phase 4 已实现 M1→D 的真实身份/主数据/参数 HTTP，D 有五个内部读取/验码操作，见[平台 OpenAPI](../../contracts/openapi/platform.v1.json)与[预约 OpenAPI](../../contracts/openapi/reservation.v1.json)。实际签到、M2/M3 业务调用、远程审计写入和通知仍未实现。后续新增方法/路径、缓存或调用行为仍须按公共契约和跨模块规则人工 Review。
+本矩阵保留目标责任边界。Phase 5 在真实 M1→D 身份/资源/参数调用上增加当日码验证和持久通知，六个 D 内部操作不经网关公开。M1 签到与 NO_SHOW 本地事务不跨 schema；提醒 HTTP 与 D 入箱具有独立提交，不声称可以原子撤回。M2/M3 业务和通用远程审计接口仍未实现；新增契约均待人工 review。
 
 ## 6. 时间、迁移与保留策略
 
-M1 本轮具体待审方案：带 offset 输入转 Instant；显式业务时区的分钟/秒/纳秒为 0，正整数小时区间；采用 `[start,end)`，相邻可用。新建/再预约开始不得早于注入 Clock，读取当前 D 最大连续时长（初始 4），不私加未来天数或一人多座限制。只有本人 CREATED 且开始前可取消；重复 CANCELLED 幂等，开始时及以后 409。历史为取消或已结束区间，不自动转换状态；再预约新建 ID 并重读当前条件。签到窗口、自动完成/违约仍未定。所有 ACTIVE 来源与 seat_id=null 均参与冲突，end_at=null 持续影响直到释放，不默认为零时长。
+M1 本轮具体待审方案：带 offset 输入转 Instant；显式业务时区的分钟/秒/纳秒为 0，正整数小时区间；采用 `[start,end)`，相邻可用。新建/再预约开始不得早于注入 Clock，读取当前 D 最大连续时长（初始 4），不私加未来天数或一人多座限制。只有本人 CREATED 且开始前可取消；重复 CANCELLED 幂等，开始时及以后 409。历史为取消或已结束区间，不自动转换状态；再预约新建 ID 并重读当前条件。本轮签到窗口为 `[T−15,T+15)`，锁后复核时间并写唯一签到；T+15 未签到最终 NO_SHOW、精确释放来源并写唯一违约/事件，保留 cancelled_at=null。正常 COMPLETED 和保留期限仍未定。所有 ACTIVE 来源与 seat_id=null 均参与冲突，end_at=null 持续影响直到释放，不默认为零时长。
 
-各迁移位于自身 `src/main/resources/db/migration/`；公共层当前 V1–V3，M1 为 V1–V2，M2/M3 为 V1，应用启动时由 Flyway 使用专属 migrator 执行；`create-schemas=false`、`clean-disabled=true`，schema 和角色由空库引导创建，禁止应用自行扩权。Flyway 迁移只向前，已执行/发布版本不可修改，修复必须创建新迁移。真实 Testcontainers 空库已自动完成各服务 V1 并通过 Flyway 校验；开发 Compose 也已实际完成本项目 down -v/up -d 空卷迁移及保留卷重启验证，见 [Phase 2 验证记录](../review/phase-2-validation.md)，不混称同一次验证。
+各迁移位于自身 `src/main/resources/db/migration/`；公共层本轮 V1–V4，M1 为 V1–V3，M2/M3 为 V1，应用启动时由 Flyway 使用专属 migrator 执行；`create-schemas=false`、`clean-disabled=true`，schema 和角色由空库引导创建，禁止应用自行扩权。Flyway 迁移只向前，已执行/发布版本不可修改，修复必须创建新迁移。真实 Testcontainers 空库已自动完成各服务 V1 并通过 Flyway 校验；开发 Compose 也已实际完成本项目 down -v/up -d 空卷迁移及保留卷重启验证，见 [Phase 2 验证记录](../review/phase-2-validation.md)，不混称同一次验证。
 
 结构与演示 seed 分离。V2 只有结构/权限变更；V3 是全环境的七角色、14 权限、初始 35 条角色权限关系和默认参数参考数据，不创建演示用户/空间。D 的 `db/seed/local/*.sql` 仅由 `local` profile 的 `LocalDemoSeed` 在事务中执行，保留角色字典的幂等写入、五个演示用户及五条用户角色关系、两栋楼、四个房间、四十个座位。五用户分别是 `demo_admin:SYSTEM_ADMIN`、`demo_student_01:STUDENT`、`demo_student_02:STUDENT`、`demo_room_admin:ROOM_ADMIN`、`demo_property_staff:PROPERTY_STAFF`，没有新增其他演示用户或预约、审批、工单。角色权限参考目录不增加用户或额外审批人；demo_room_admin 初始没有房间 scope。通过管理员 API 创建的合法业务/测试用户不同于扩充 local seed。
 
 本地演示密码从私有环境提供，校验为非空白且 24–72 UTF-8 字节，生成五个独立 BCrypt(12) 哈希后参数绑定。各 seed 依据自然唯一键 `ON CONFLICT DO NOTHING`，关系 id 通过本 schema JOIN 获取，座位只匹配四个指定演示房间。重复执行不会扩充数量、覆盖已有字段或重置已有密码。Phase 3 的真实 non-local 测试已验证：保留 V3 参考目录和参数，不创建演示用户/空间/码/审计，也不要求演示密码。所有 profile 均要求外部 JWT/独立内部凭据和显式业务时区；无默认生产管理员，初始化及秘密注入/轮换流程仍须后续运维审阅。
+
+Phase 5 的提醒状态为 PENDING/SENDING/ACCEPTED/EXPIRED/FAILED。默认30秒独立扫描/发送，调度池2，30秒lease；最多3次总尝试，网络/5xx按30/60秒退避，4xx/坏契约不重试。停机恢复只发送当前有效窗口的提醒，NO_SHOW 优先；重复入箱用稳定来源键核对同载荷。
 
 违约、操作审计、业务事件、通知、个人信息的保存周期未指定；保留、删除、脱敏、停用资源与历史可追溯的政策应持续记录于工程伦理文档。不得预先填入任意保留天数，亦不得将日志当作业务真值来源。
 
@@ -146,4 +150,6 @@ Phase 0 只检查文档覆盖与一致性。以下保留历史：Phase 2 已执�
 
 Phase 3 当前已有 32 操作及真实 HTTP/PostgreSQL 测试代码：登录/改密/重置、JWT 到期/签名/issuer/audience/authVersion、即时撤权、用户/角色/范围管理、最后启用系统管理员并发保护、空间维护、参数、上海日界/并发码及内部身份。完整套件已执行，Surefire 核对共 49 项通过、0 失败、0 错误、0 跳过：D 身份 12 项、空间/公共服务 7 项、用户/角色/审计 7 项、运行/seed 7 项、non-local 1 项，另三服务各 5 项；前端 6 项及 lint/类型检查/构建也通过。通过代码测试的首个功能分项已提交 c5fd067012ea40c8a9163261e0bb9b68f4c71a19。实际 Compose 保留已有 Phase 2 数据卷从 V1 升至 V3，原演示实体与五用户密码指纹不变，五镜像构建、七容器健康、公开/内部边界和真实公共层 smoke 已通过。首次联调为 c5fd067012ea40c8a9163261e0bb9b68f4c71a19-dirty / 2026-10-24T13:03:02Z；本轮没有执行 down -v，不将 Phase 2 历史重放冒充本次升级。最终干净提交重建元数据由仓库外交付报告记录，过程见[Phase 3 记录](../plans/phase-3.md)。
 
-Phase 4 以真实 D JAR/HTTP 与 Testcontainers PostgreSQL 验证 M1 查询/插座、当前 D 参数、首次房间锁竞争、相邻区间和所有来源/开放结束冲突、即时撤权/停用、本人取消/历史/再预约及账本回滚。完整 reactor 69 项通过后再加入 6 项客户端错误响应边界测试，M1 最终子集 28 项通过；当前 Surefire 共 75 项通过、0 失败/错误/跳过。客户端错误响应夹具仅验证失败边界，不替代真实 D 集成。首次 Compose 保留卷升级至 D V3/M1 V2、七容器健康、真实网关公共层回归与预约/取消/再预约均通过，原演示计数和五用户密码指纹不变；实际 Nginx 配置与数据库隔离/审计/账本/事件检查通过。首次构建为 6d98a8752f9f5babb4e1f28b178d3dacaf798bf9-dirty / 2026-10-25T14:30:16Z；最终干净版本重建另见 [Phase 4 验证](../review/phase-4-validation.md)，不预填。后续仍须验证签到、M2/M3 经 HTTP 改变占用的幂等/失败恢复、完整 Web、全服务日志、CI/CD 与云部署。
+Phase 4 以真实 D JAR/HTTP 与 Testcontainers PostgreSQL 验证 M1 查询/插座、当前 D 参数、首次房间锁竞争、相邻区间和所有来源/开放结束冲突、即时撤权/停用、本人取消/历史/再预约及账本回滚。完整 reactor 69 项通过后再加入 6 项客户端错误响应边界测试，M1 最终子集 28 项通过；当前 Surefire 共 75 项通过、0 失败/错误/跳过。客户端错误响应夹具仅验证失败边界，不替代真实 D 集成。首次 Compose 保留卷升级至 D V3/M1 V2、七容器健康、真实网关公共层回归与预约/取消/再预约均通过，原演示计数和五用户密码指纹不变；实际 Nginx 配置与数据库隔离/审计/账本/事件检查通过。首次构建为 6d98a8752f9f5babb4e1f28b178d3dacaf798bf9-dirty / 2026-10-25T14:30:16Z；最终干净版本重建另见 [Phase 4 验证](../review/phase-4-validation.md)，不预填。此段保留 Phase 4 历史证据；Phase 5 正在验证签到/提醒/违约，后续仍须验证 M2/M3 经 HTTP 改变占用的幂等/失败恢复、完整 Web、全服务日志、CI/CD 与云部署。
+
+Phase 5 的 D V4/M1 V3、当日码签到、严格截止、锁等待跨截止、重复扫描/接收、停机补偿、签退抑制和违约原子释放正在真实 HTTP/PostgreSQL 与可注入 Clock 下验证；当前不预填通过数量、Compose 升级或最终 SHA 结果，见[本轮验收](../review/phase-5-validation.md)。完整 Web 仍在 Phase 9，违约保存期限不因模型已建立而视为获批。

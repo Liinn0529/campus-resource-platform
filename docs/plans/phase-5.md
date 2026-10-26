@@ -22,3 +22,7 @@
 完整签到业务页面及前端 E2E 仍属 Phase 9/10，不临时增加页面冒充已完成。Phase 6 审批、Phase 8 M2/M3 占用写接口、CI/CD 均未授权。
 
 功能分项已验证：完整 clean reactor 102 项通过（D43/M1 49/M2与M3各5），0失败/错误/跳过；前端lint、6项测试与含类型检查构建通过。D35/M1 10操作OpenAPI正式规范及Controller对照通过，已发布迁移不变。真实开发卷升级与最终SHA重建仍待完成，未执行结果不预填。
+
+## 首次实际运行
+
+首个功能分项18b245e94378c33224b61b01a14b25b1b2ffc9af已上传[PR #6](https://github.com/Liinn0529/campus-resource-platform/pull/6)。首轮五应用镜像构建UTC 2026-10-26T14:01:35Z，版本为该SHA-dirty；保留原卷升级至D4/M1 V3、七容器健康、Phase3/4回归与Phase5网关守卫/本人读取通过。数据库隔离/账本/事件/回执、原有计数/密码保留、实际CORS与日志排除检查通过。固定时点全部业务行为来自102项真实HTTP/PostgreSQL与注入Clock测试，开发卷不调时或手造违约/通知。最终干净版本仍待重建核对，实际命令与边界见[验收记录](../review/phase-5-validation.md)。
