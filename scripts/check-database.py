@@ -38,8 +38,9 @@ def main():
     phase.add_argument("--phase3", action="store_true", help="Check platform V3, reference permissions and append-only audit")
     phase.add_argument("--phase4", action="store_true", help="Also check reservation V2 and workflow ledger consistency")
     phase.add_argument("--phase5", action="store_true", help="Check platform V4, reservation V3 and check-in/no-show/reminders")
+    phase.add_argument("--phase6", action="store_true", help="Also check classroom V2 and approval/synchronization consistency")
     args = parser.parse_args()
-    platform_v3 = args.phase3 or args.phase4 or args.phase5
+    platform_v3 = args.phase3 or args.phase4 or args.phase5 or args.phase6
 
     expected_roles = sorted(schema + suffix for schema in SCHEMAS for suffix in ("_app", "_migrator"))
     rows = query("SELECT rolname || '|' || rolsuper || '|' || rolcreatedb || '|' || rolcreaterole || '|' "
@@ -51,11 +52,13 @@ def main():
 
     versions = {schema: (["1", "2", "3"] if platform_v3 and schema == "platform" else ["1"])
                 for schema in SCHEMAS}
-    if args.phase4 or args.phase5:
+    if args.phase4 or args.phase5 or args.phase6:
         versions["reservation"] = ["1", "2"]
-    if args.phase5:
+    if args.phase5 or args.phase6:
         versions["platform"] = ["1", "2", "3", "4"]
         versions["reservation"] = ["1", "2", "3"]
+    if args.phase6:
+        versions["classroom"] = ["1", "2"]
     for schema in SCHEMAS:
         assert query("SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname='" + schema + "'") == schema + "_migrator"
         assert query("SELECT version || '|' || success FROM " + schema
@@ -99,10 +102,12 @@ def main():
     if platform_v3:
         evidence.pop("version")
         evidence["versions"] = versions
-    if args.phase4 or args.phase5:
-        check_reservation_workflow(args.phase5)
-    if args.phase5:
+    if args.phase4 or args.phase5 or args.phase6:
+        check_reservation_workflow(args.phase5 or args.phase6)
+    if args.phase5 or args.phase6:
         check_lifecycle()
+    if args.phase6:
+        check_classroom()
     if args.compare:
         assert json.loads(args.compare.read_text()) == evidence, "Data or existing passwords changed on restart"
         print("PASS: restart retained exact counts, migration versions and existing password hashes")
@@ -189,6 +194,44 @@ def check_lifecycle():
     summary["notifications"] = int(query("SELECT count(*) FROM platform.notification", "platform"))
     print("PASS: check-in/no-show uniqueness, automated event actors, reminder windows and actual D receipts",
           json.dumps(summary, sort_keys=True))
+
+
+def check_classroom():
+    assert query("SELECT count(*) FROM classroom.classroom_request r WHERE "
+                 "(SELECT count(*) FROM classroom.approval_step s WHERE s.request_id=r.id)<>2", "classroom") == "0"
+    assert query("SELECT count(*) FROM classroom.classroom_request r WHERE r.status IN ('SUBMITTED','APPROVING') "
+                 "AND ((SELECT count(*) FROM classroom.approval_step s WHERE s.request_id=r.id AND s.status='PENDING')<>1 "
+                 "OR NOT EXISTS(SELECT 1 FROM classroom.approval_step s WHERE s.request_id=r.id AND s.status='PENDING' "
+                 "AND s.due_at=r.approval_due_at AND s.step_number=CASE WHEN r.status='SUBMITTED' THEN 1 ELSE 2 END))",
+                 "classroom") == "0"
+    assert query("SELECT count(*) FROM classroom.approval_action a JOIN classroom.classroom_request r ON r.id=a.request_id "
+                 "WHERE a.actor_id=r.applicant_id", "classroom") == "0"
+    assert query("SELECT count(*) FROM classroom.approval_action a JOIN classroom.approval_action b "
+                 "ON a.request_id=b.request_id AND a.step_number=1 AND b.step_number=2 "
+                 "WHERE a.action='APPROVE' AND b.action='APPROVE' AND a.actor_id=b.actor_id", "classroom") == "0"
+    assert query("SELECT count(*) FROM classroom.approval_action a LEFT JOIN classroom.approval_step s "
+                 "ON s.request_id=a.request_id AND s.step_number=a.step_number WHERE s.id IS NULL "
+                 "OR s.actor_id IS DISTINCT FROM a.actor_id OR s.status<>CASE WHEN a.action='APPROVE' THEN 'APPROVED' ELSE 'REJECTED' END",
+                 "classroom") == "0"
+    assert query("SELECT count(*) FROM classroom.classroom_request r WHERE r.status IN "
+                 "('APPROVED_PENDING_SYNC','SYNC_FAILED','APPROVED') AND "
+                 "(SELECT count(*) FROM classroom.approval_step s WHERE s.request_id=r.id AND s.status='APPROVED')<>2",
+                 "classroom") == "0"
+    assert query("SELECT count(*) FROM classroom.classroom_request r WHERE NOT EXISTS "
+                 "(SELECT 1 FROM classroom.classroom_event e WHERE e.request_id=r.id AND e.action='SUBMITTED')",
+                 "classroom") == "0"
+    for status, event in (("CANCELLED","CANCELLED"),("AUTO_CANCELLED","AUTO_CANCELLED"),("SYNC_FAILED","SYNC_FAILED"),("APPROVED","OCCUPANCY_CONFIRMED")):
+        assert query("SELECT count(*) FROM classroom.classroom_request r WHERE r.status='"+status+"' AND NOT EXISTS "
+                     "(SELECT 1 FROM classroom.classroom_event e WHERE e.request_id=r.id AND e.action='"+event+"')", "classroom") == "0"
+    assert query("SELECT count(*) FROM classroom.classroom_request WHERE status='APPROVED'", "classroom") == "0", (
+        "Phase 6 baseline has no real Phase 8 receipt; investigate any claimed approval")
+    assert query("SELECT count(*) FROM reservation.seat_occupancy WHERE source_module='M2'", "reservation") == "0", (
+        "Phase 6 baseline must not fabricate M2 occupancies")
+    assert query("SELECT count(*) FROM classroom.classroom_request WHERE status IN ('CANCELLED','AUTO_CANCELLED') "
+                 "AND (sync_attempts<>0 OR occupancy_id IS NOT NULL)", "classroom") == "0"
+    counts={table:int(query("SELECT count(*) FROM classroom."+table,"classroom")) for table in
+            ("classroom_request","approval_step","approval_action","classroom_event")}
+    print("PASS: classroom V2 stages, owner separation, decisions/events and truthful Phase 8 dependency",json.dumps(counts,sort_keys=True))
 
 
 if __name__ == "__main__":

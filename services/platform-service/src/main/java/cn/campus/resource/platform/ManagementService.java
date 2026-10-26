@@ -86,7 +86,7 @@ class ManagementService {
         }
         mapper.deleteUserRoles(id);
         roleCodes.stream().sorted().forEach(code -> mapper.insertUserRole(id, code));
-        if (!roleCodes.contains("ROOM_ADMIN")) {
+        if (!roleCodes.contains("ROOM_ADMIN") && !roleCodes.contains("DEPARTMENT_ADMIN")) {
             mapper.deleteUserRooms(id);
         }
         audit.record("USER_ROLES_REPLACED", "USER", Long.toString(id));
@@ -97,8 +97,9 @@ class ManagementService {
     UserView replaceRooms(long id, Set<Long> roomIds) {
         access.requireGlobal("user:manage");
         lockedUser(id);
-        if (!mapper.userRoles(id).contains("ROOM_ADMIN")) {
-            throw invalid("Room scopes require the ROOM_ADMIN role");
+        List<String> roles = mapper.userRoles(id);
+        if (!roles.contains("ROOM_ADMIN") && !roles.contains("DEPARTMENT_ADMIN")) {
+            throw invalid("Room scopes require an approval role");
         }
         if (roomIds.stream().anyMatch(roomId -> !mapper.roomExists(roomId))) {
             throw invalid("Unknown room reference");
@@ -107,6 +108,12 @@ class ManagementService {
         roomIds.stream().sorted().forEach(roomId -> mapper.insertUserRoom(id, roomId));
         audit.record("USER_ROOM_SCOPES_REPLACED", "USER", Long.toString(id));
         return view(mapper.user(id));
+    }
+
+    @Transactional(readOnly = true)
+    List<Long> ownRoomScopes() {
+        access.require("classroom:approve");
+        return mapper.userRooms(access.actor().id());
     }
 
     @Transactional(readOnly = true)

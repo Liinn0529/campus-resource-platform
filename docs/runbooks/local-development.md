@@ -8,7 +8,7 @@
 ./scripts/dev-up.sh
 ```
 
-脚本将随机密码、JWT 签名秘密及三个独立内部调用方凭据写入权限 600 的私有 `.env`，保留已有非空值并补齐缺失或空的值；默认业务时区为 Asia/Shanghai。之后以当前真实 Git SHA 和 UTC 时间构建五个应用镜像，再启动 Compose 并等待健康检查。已有 Phase 2/3/4 volume 自动执行尚未应用的 D V2–V4 与 M1 V2/V3，无需删除；Phase 1 旧卷不会重新 bootstrap，升级前阅读下文。
+脚本将随机密码、JWT 签名秘密及D的三个独立调用方凭据及M2到M1的独立凭据写入权限 600 的私有 `.env`，保留已有非空值并补齐缺失或空的值；默认业务时区为 Asia/Shanghai。之后以当前真实 Git SHA 和 UTC 时间构建五个应用镜像，再启动 Compose 并等待健康检查。已有 Phase 2/3/4 volume 自动执行尚未应用的 D V2–V4、M1 V2/V3及M2 V2，无需删除；Phase 1 旧卷不会重新 bootstrap，升级前阅读下文。
 
 也可逐步执行：
 
@@ -23,7 +23,7 @@ pnpm build
 ./scripts/build.sh
 docker compose up -d
 docker compose ps
-python3 scripts/check-database.py --phase5
+python3 scripts/check-database.py --phase6
 ```
 
 本地入口：<http://127.0.0.1:18080>。端口冲突时修改 `.env` 的 `WEB_PORT` 后重新 `docker compose up -d`。只绑定 loopback，数据库与四服务没有宿主机端口。
@@ -49,7 +49,7 @@ mvn clean verify -DgitCommit="$(git rev-parse HEAD)" -DbuildTime="$(date -u +%Y-
 
 `POSTGRES_PASSWORD` 只供数据库 bootstrap 管理员使用；服务不使用该账号。官方 PostgreSQL entrypoint 在空 volume 上执行 `deploy/postgres/010-service-databases.sh`，建立四个 schema 及八个无角色成员关系的普通登录账号。每个迁移账号拥有自己的 schema，应用账号只有自身 schema 的 USAGE、表的 SELECT/INSERT/UPDATE/DELETE 与序列的 USAGE/SELECT；应用账号没有 DDL、TRUNCATE 或 Flyway 历史表访问权限，公共层 app 也不能更新/删除 audit_log。PUBLIC 的数据库 CONNECT/TEMP 和 public schema 权限已撤销，账号不能访问其他服务 schema。
 
-每个服务以应用凭据建立数据源，另以迁移凭据运行 `src/main/resources/db/migration/` 中的 Flyway migration。配置固定自身 schema，禁止自动创建 schema，关闭 Flyway clean；已发布迁移保持不可修改。当前公共层本轮追加 V4、预约服务追加 V3，已发布 D V1–V3/M1 V1–V2 不变，M2/M3 各有 V1。V2 增加身份版本、房间范围、系统参数、签到码及审计，V3 加载七角色、14 权限、初始 35 条角色权限关系和默认最大预约时长 4。这些是所有环境的应用参考目录，不是演示用户 seed。M1 V2 创建 room_gate、seat_reservation、完整 11 字段 seat_occupancy 和 reservation_event，本轮 M1 V3 增加 checkin、violation、reminder，D V4 增加 notification；审批和工单表留后续阶段。
+每个服务以应用凭据建立数据源，另以迁移凭据运行 `src/main/resources/db/migration/` 中的 Flyway migration。配置固定自身 schema，禁止自动创建 schema，关闭 Flyway clean；已发布迁移保持不可修改。当前D保持V4、M1保持V3，M2本轮追加V2四表、M3保持V1，已发布版本不改写。V2 增加身份版本、房间范围、系统参数、签到码及审计，V3 加载七角色、14 权限、初始 35 条角色权限关系和默认最大预约时长 4。这些是所有环境的应用参考目录，不是演示用户 seed。M1 V2 创建 room_gate、seat_reservation、完整 11 字段 seat_occupancy 和 reservation_event，本轮 M1 V3 增加 checkin、violation、reminder，D V4 增加 notification；M2审批表本轮创建，工单表留Phase7。
 
 ## 身份配置与仅限本地的 seed
 
@@ -61,11 +61,11 @@ local 演示集合保持 5 个用户、5 条用户角色映射、2 栋楼、4 �
 
 ## 数据库验证
 
-后端套件使用真实 HTTP/PostgreSQL，覆盖隔离数据库、公共层和基础预约；Phase 5 增加房间码签到、注入 Clock 的全部节点、持久提醒去重/恢复、NO_SHOW 原子释放与本人可见性。本轮完整clean reactor102项、前端6项、Compose原卷升级和网关检查通过；最终版本待核对，执行数量和结果以实际 Surefire 与[Phase 5 验收](../review/phase-5-validation.md)为准，不预填通过：
+后端套件使用真实 HTTP/PostgreSQL，覆盖隔离数据库、公共层和基础预约；Phase 5 增加房间码签到、注入 Clock 的全部节点、持久提醒去重/恢复、NO_SHOW 原子释放与本人可见性。本轮Phase6完整clean reactor130项、前端6项、Compose原卷升级和真实审批网关检查通过；最终版本证据另见仓库外交付报告，数量和结果以实际Surefire与[Phase6验收](../review/phase-6-validation.md)为准：
 
 ```sh
 ./scripts/test-backend.sh
-python3 scripts/check-database.py --phase5
+python3 scripts/check-database.py --phase6
 ```
 
 第二条命令针对当前 Compose 数据库，使用容器内凭据经 TCP 验证八个账号；它检查 schema 所有者、角色属性、跨 schema 拒绝、应用 DDL/迁移历史/审计权限、公共层 V4、预约 V3 和其他两个 V1，以及演示基线和预约/账本/事件一致性。失败时退出非零，不打印凭据或用户哈希。它适用于当前阶段的本地演示基线；通过管理 API 创建额外合法数据或调整权限后，应按脚本能力和实际数据判断，不能把变化当作 seed 自动扩充。
@@ -74,10 +74,10 @@ python3 scripts/check-database.py --phase5
 
 ```sh
 mkdir -p .local
-python3 scripts/check-database.py --phase5 --snapshot .local/phase-5-database.json
+python3 scripts/check-database.py --phase6 --snapshot .local/phase-5-database.json
 docker compose down
 docker compose up -d --wait --wait-timeout 180
-python3 scripts/check-database.py --phase5 --compare .local/phase-5-database.json
+python3 scripts/check-database.py --phase6 --compare .local/phase-5-database.json
 ```
 
 快照只包含计数、版本和指纹，放在 Git 忽略的 `.local/`；不提交原始用户密码哈希。快照比较固定 seed、密码指纹与迁移版本；真实预约 smoke 会增加取消历史，历史数量不作为重启固定值，但每次仍检查账本/事件一致性。Phase 4→5 升级前后的迁移版本预期不同，不能直接用旧阶段快照做完全相等比较；保留原演示计数和密码指纹单独比较。实际验收结果见 [Phase 5 记录](../review/phase-5-validation.md)，本手册描述可复现步骤。
@@ -92,7 +92,7 @@ python3 scripts/check-database.py --phase5 --compare .local/phase-5-database.jso
 docker compose down -v
 ./scripts/init-env.sh
 docker compose up -d --wait --wait-timeout 180
-python3 scripts/check-database.py --phase5
+python3 scripts/check-database.py --phase6
 ```
 
 这里使用已构建镜像重放；源码有改动时先运行 `./scripts/build.sh`。不对其他项目执行停止或 volume 删除操作。
@@ -140,10 +140,10 @@ Phase 5 在基础预约上增加签到、持久站内提醒与 NO_SHOW/违约；
 ## 签到、提醒与违约验证
 
 ```sh
-python3 scripts/smoke-phase-5.py --expected-commit "$(git rev-parse HEAD)"
+python3 scripts/smoke-phase-6.py --expected-commit "$(git rev-parse HEAD)"
 ```
 
-本轮首次运行验收通过，最终干净SHA待核对，结果见[Phase 5 验证](../review/phase-5-validation.md)。严格时点的完整测试通过注入 Clock 和真实 D/数据库完成；实际开发卷不修改系统时钟或旧预约时间来获得成功。本人签到窗口、状态码、提醒恢复/失败与隐私边界见[后端手册](backend.md#phase-5-签到提醒与违约)。
+Phase5首次及最终运行已通过，历史结果见[Phase5验证](../review/phase-5-validation.md)。严格时点的完整测试通过注入 Clock 和真实 D/数据库完成；实际开发卷不修改系统时钟或旧预约时间来获得成功。本人签到窗口、状态码、提醒恢复/失败与隐私边界见[后端手册](backend.md#phase-5-签到提醒与违约)。
 
 默认独立扫描和发送任务各30秒、每批100，调度池2，D 网络等待不占用房间锁也不阻塞独立 NO_SHOW 扫描。提醒有30秒claim lease、最多3次总尝试、网络/5xx退避30/60秒；过期跳过，4xx/坏响应终止，签到/取消抑制待发项。在途请求不能跨服务原子撤回，ACCEPTED 仅表示 D 站内持久接收。正常完成触发、补签到、封号积分和保存期限均未擅自补全。
 
@@ -159,3 +159,11 @@ docker compose down
 普通 `down` 保留 PostgreSQL volume。删除 volume 只按上文空库重放步骤执行。这些命令均按本项目 Compose 名称操作。
 
 当前 health 包含真实数据源连接检查，详情不对外暴露；它不代表尚未实现的业务流程可用。此环境用于本地开发和验证；JWT/RBAC 方案已在本阶段实现，生产 HTTPS、密钥运维、CI/CD 和云部署仍按后续阶段实施。
+
+## Phase6当前接口与验证
+
+M2六操作见[教室API](../api/classroom.md)，D新增本人审批范围。M2使用D和M1两种独立opaque凭据，Compose配置PLATFORM_BASE_URL/PLATFORM_CLASSROOM_TOKEN及M1_BASE_URL/M1_CLASSROOM_TOKEN；init-env保留旧凭据并补齐新值，不输出秘密。现有D4/M1 V3保留，M2从V1升V2、M3仍V1，保留卷升级，无需删除数据。
+
+运行 `python3 scripts/smoke-phase-6.py --expected-commit <实际构建SHA>` 先回归Phase5，再验证真实D范围、提交/两级审批/拒绝/撤销/撤权与实际M1 403→SYNC_FAILED；临时为现有第二学生赋部门角色/范围后恢复，不扩seed。不会声称真实封房成功。定时超时/成功回执/重试边界另由真实HTTP/PostgreSQL+Clock或明确外部响应夹具验证。`check-database.py --phase6`核对M2四表一致性和没有假APPROVED/M2占用的当前阶段基线。
+
+本地后端测试使用容器内部Linux工作区，公共Git源码归档不含.env；导出JAR、Surefire和JaCoCo XML，避免宿主同步class文件错误。完整130项通过，运行升级和最终SHA实际证据见[Phase6验收](../review/phase-6-validation.md)。完整角色Web/E2E留Phase9/10，M1占用/释放/恢复留Phase8；完成Phase6后停止等待Phase7。

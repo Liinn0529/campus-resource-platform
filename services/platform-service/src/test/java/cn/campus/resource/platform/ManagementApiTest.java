@@ -119,7 +119,7 @@ class ManagementApiTest extends ApiTestSupport {
     }
 
     @Test
-    void roomScopesRequireTheRoomAdminRoleAndAreClearedWhenTheRoleIsRemoved() {
+    void roomScopesRejectNonApprovalRolesAndAreClearedWhenTheRoleIsRemoved() {
         String admin = login("demo_admin");
         long id = create(uniqueUsername(), Set.of("ROOM_ADMIN"), admin);
         long roomId = jdbc.queryForObject("SELECT min(id) FROM platform.room", Long.class);

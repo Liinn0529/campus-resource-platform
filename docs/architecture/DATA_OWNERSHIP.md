@@ -1,6 +1,6 @@
 # 数据所有权与一致性边界
 
-状态：Phase 5 签到、提醒与违约实现与首次验证通过，schema/契约仍待人工 review。D 新增 V4 notification，M1 新增 V3 checkin/violation/reminder，保留已发布迁移、四 schema/八账号与最小 seed；D 35/M1 10 个操作的实际测试、Compose 升级和最终版本结果按[Phase 5 验证](../review/phase-5-validation.md)记录，不预填。完成后停止等待 Phase 6；API 见[平台](../api/platform.md)和[预约](../api/reservation.md)。
+状态：Phase6申请、两级审批、拒绝、前置撤销、超时与持久同步已实现，130项后端及首轮真实运行验收通过。D4/M1 V3/M2 V2/M3 V1，D36/M1 10/M2 6操作；schema/公共契约仍待草稿PR人工review。真实M1封房/释放留Phase8，当前403明确记SYNC_FAILED；完整Web留Phase9。验证和最终干净版本证据见[Phase6验收](../review/phase-6-validation.md)，完成后等待Phase7。
 
 依据：[原始执行要求](../requirements/CODEX_EXECUTION_PROMPT.md)第 5–16、24、27、29 节。配套：[架构](ARCHITECTURE.md)、[ADR-001](../adr/ADR-001-service-boundary.md)、[需求](../requirements/REQUIREMENTS.md)、[追踪表](../requirements/TRACEABILITY.md)。
 
@@ -42,7 +42,7 @@ Phase 2 由 [PostgreSQL 空库引导脚本](../../deploy/postgres/010-service-da
 | `platform.building` | identity 主键、唯一楼宇 code、名称 |
 | `platform.room` | identity 主键、building 外键、楼内 code 唯一、`STUDY_ROOM/CLASSROOM` 类型约束、启用标记 |
 | `platform.seat` | identity 主键、room 外键、房内 code 唯一、插座标记、启用标记；不设置业务占用状态 |
-| `platform.user_room_scope` | V2 `(user_id,room_id)` 复合主键，均为 D 外键；管理接口只向 ROOM_ADMIN 分配，无隐式范围 |
+| `platform.user_room_scope` | V2 `(user_id,room_id)` 复合主键，均为 D 外键；管理接口向ROOM_ADMIN或DEPARTMENT_ADMIN显式分配，无隐式范围 |
 | `platform.system_setting` | V2 key 主键、正整数 value；V3 默认 max_reservation_hours=4 |
 | `platform.room_checkin_code` | V2 `(room_id,date)` 主键、D room 外键、8 位安全字符约束、created_at；code 不要求全局唯一 |
 | `platform.audit_log` | V2 identity 主键、同 D actor 用户引用、来源/动作/目标 ID、UUID request_id、时间；app 只新增/查询，不可更新或删除；内部提醒接收使用空 actor、来源 reservation-service |
@@ -105,7 +105,7 @@ Phase 2 的 reservation V1 为权限基线，Phase 4 V2 创建 room_gate、seat_
 
 ## 4. M2 与 M3：业务状态与占用状态分开管理
 
-Phase 2 的 `classroom`、`maintenance` V1 只建立迁移版本/权限基线，无审批、申请或工单表。M2 表随 Phase 6，M3 表随 Phase 7 创建；不以占位业务表固定未定状态与字段。
+Phase 2 的 `classroom`、`maintenance` V1 只建立迁移版本/权限基线，无审批、申请或工单表。M2本轮追加V2四表，M3表随Phase7创建；不以占位业务表固定未定状态与字段。
 
 M2 拥有 `classroom_request`、`approval_step`、`approval_action`、`classroom_event`，包含审批链、审批决定和自身同步状态。批准后先进入 `APPROVED_PENDING_SYNC`，真实调用 M1 成功后进入 `APPROVED`；失败经规定的有界重试进入 `SYNC_FAILED`，不得将未确认同步伪装成已完成批准。
 
@@ -128,11 +128,11 @@ M2/M3 只能通过 `POST /internal/v1/room-blocks` 和 `DELETE /internal/v1/room
 | Web | 各模块公开业务数据 | 对应后端服务 | 公开 API，无数据库访问权 |
 | 可选 Agent | 源指定业务操作 | 对应后端服务 | 公开 API，继承真实用户权限，不直连数据库 |
 
-本矩阵保留目标责任边界。Phase 5 在真实 M1→D 身份/资源/参数调用上增加当日码验证和持久通知，六个 D 内部操作不经网关公开。M1 签到与 NO_SHOW 本地事务不跨 schema；提醒 HTTP 与 D 入箱具有独立提交，不声称可以原子撤回。M2/M3 业务和通用远程审计接口仍未实现；新增契约均待人工 review。
+本矩阵保留目标责任边界。Phase 5 在真实 M1→D 身份/资源/参数调用上增加当日码验证和持久通知，六个 D 内部操作不经网关公开。M1 签到与 NO_SHOW 本地事务不跨 schema；提醒 HTTP 与 D 入箱具有独立提交，不声称可以原子撤回。M2本轮业务及真实D/M1客户端已实现；M3业务和通用远程审计接口仍未实现；新增契约均待人工 review。
 
 ## 6. 时间、迁移与保留策略
 
-M1 本轮具体待审方案：带 offset 输入转 Instant；显式业务时区的分钟/秒/纳秒为 0，正整数小时区间；采用 `[start,end)`，相邻可用。新建/再预约开始不得早于注入 Clock，读取当前 D 最大连续时长（初始 4），不私加未来天数或一人多座限制。只有本人 CREATED 且开始前可取消；重复 CANCELLED 幂等，开始时及以后 409。历史为取消或已结束区间，不自动转换状态；再预约新建 ID 并重读当前条件。本轮签到窗口为 `[T−15,T+15)`，锁后复核时间并写唯一签到；T+15 未签到最终 NO_SHOW、精确释放来源并写唯一违约/事件，保留 cancelled_at=null。正常 COMPLETED 和保留期限仍未定。所有 ACTIVE 来源与 seat_id=null 均参与冲突，end_at=null 持续影响直到释放，不默认为零时长。
+M1 Phase4/5具体待审方案：带 offset 输入转 Instant；显式业务时区的分钟/秒/纳秒为 0，正整数小时区间；采用 `[start,end)`，相邻可用。新建/再预约开始不得早于注入 Clock，读取当前 D 最大连续时长（初始 4），不私加未来天数或一人多座限制。只有本人 CREATED 且开始前可取消；重复 CANCELLED 幂等，开始时及以后 409。历史为取消或已结束区间，不自动转换状态；再预约新建 ID 并重读当前条件。本轮签到窗口为 `[T−15,T+15)`，锁后复核时间并写唯一签到；T+15 未签到最终 NO_SHOW、精确释放来源并写唯一违约/事件，保留 cancelled_at=null。正常 COMPLETED 和保留期限仍未定。所有 ACTIVE 来源与 seat_id=null 均参与冲突，end_at=null 持续影响直到释放，不默认为零时长。
 
 各迁移位于自身 `src/main/resources/db/migration/`；公共层本轮 V1–V4，M1 为 V1–V3，M2/M3 为 V1，应用启动时由 Flyway 使用专属 migrator 执行；`create-schemas=false`、`clean-disabled=true`，schema 和角色由空库引导创建，禁止应用自行扩权。Flyway 迁移只向前，已执行/发布版本不可修改，修复必须创建新迁移。真实 Testcontainers 空库已自动完成各服务 V1 并通过 Flyway 校验；开发 Compose 也已实际完成本项目 down -v/up -d 空卷迁移及保留卷重启验证，见 [Phase 2 验证记录](../review/phase-2-validation.md)，不混称同一次验证。
 
@@ -150,6 +150,16 @@ Phase 0 只检查文档覆盖与一致性。以下保留历史：Phase 2 已执�
 
 Phase 3 当前已有 32 操作及真实 HTTP/PostgreSQL 测试代码：登录/改密/重置、JWT 到期/签名/issuer/audience/authVersion、即时撤权、用户/角色/范围管理、最后启用系统管理员并发保护、空间维护、参数、上海日界/并发码及内部身份。完整套件已执行，Surefire 核对共 49 项通过、0 失败、0 错误、0 跳过：D 身份 12 项、空间/公共服务 7 项、用户/角色/审计 7 项、运行/seed 7 项、non-local 1 项，另三服务各 5 项；前端 6 项及 lint/类型检查/构建也通过。通过代码测试的首个功能分项已提交 c5fd067012ea40c8a9163261e0bb9b68f4c71a19。实际 Compose 保留已有 Phase 2 数据卷从 V1 升至 V3，原演示实体与五用户密码指纹不变，五镜像构建、七容器健康、公开/内部边界和真实公共层 smoke 已通过。首次联调为 c5fd067012ea40c8a9163261e0bb9b68f4c71a19-dirty / 2026-10-24T13:03:02Z；本轮没有执行 down -v，不将 Phase 2 历史重放冒充本次升级。最终干净提交重建元数据由仓库外交付报告记录，过程见[Phase 3 记录](../plans/phase-3.md)。
 
-Phase 4 以真实 D JAR/HTTP 与 Testcontainers PostgreSQL 验证 M1 查询/插座、当前 D 参数、首次房间锁竞争、相邻区间和所有来源/开放结束冲突、即时撤权/停用、本人取消/历史/再预约及账本回滚。完整 reactor 69 项通过后再加入 6 项客户端错误响应边界测试，M1 最终子集 28 项通过；当前 Surefire 共 75 项通过、0 失败/错误/跳过。客户端错误响应夹具仅验证失败边界，不替代真实 D 集成。首次 Compose 保留卷升级至 D V3/M1 V2、七容器健康、真实网关公共层回归与预约/取消/再预约均通过，原演示计数和五用户密码指纹不变；实际 Nginx 配置与数据库隔离/审计/账本/事件检查通过。首次构建为 6d98a8752f9f5babb4e1f28b178d3dacaf798bf9-dirty / 2026-10-25T14:30:16Z；最终干净版本重建另见 [Phase 4 验证](../review/phase-4-validation.md)，不预填。此段保留 Phase 4 历史证据；Phase 5 正在验证签到/提醒/违约，后续仍须验证 M2/M3 经 HTTP 改变占用的幂等/失败恢复、完整 Web、全服务日志、CI/CD 与云部署。
+Phase 4 以真实 D JAR/HTTP 与 Testcontainers PostgreSQL 验证 M1 查询/插座、当前 D 参数、首次房间锁竞争、相邻区间和所有来源/开放结束冲突、即时撤权/停用、本人取消/历史/再预约及账本回滚。完整 reactor 69 项通过后再加入 6 项客户端错误响应边界测试，M1 最终子集 28 项通过；当前 Surefire 共 75 项通过、0 失败/错误/跳过。客户端错误响应夹具仅验证失败边界，不替代真实 D 集成。首次 Compose 保留卷升级至 D V3/M1 V2、七容器健康、真实网关公共层回归与预约/取消/再预约均通过，原演示计数和五用户密码指纹不变；实际 Nginx 配置与数据库隔离/审计/账本/事件检查通过。首次构建为 6d98a8752f9f5babb4e1f28b178d3dacaf798bf9-dirty / 2026-10-25T14:30:16Z；最终干净版本重建另见 [Phase 4 验证](../review/phase-4-validation.md)，不预填。此段保留 Phase 4 历史证据；Phase5已完成签到/提醒/违约验证，后续仍须验证 M2/M3 经 HTTP 改变占用的幂等/失败恢复、完整 Web、全服务日志、CI/CD 与云部署。
 
-Phase 5 的 D V4/M1 V3、当日码签到、严格截止、锁等待跨截止、重复扫描/接收、停机补偿、签退抑制和违约原子释放正在真实 HTTP/PostgreSQL 与可注入 Clock 下验证；当前不预填通过数量、Compose 升级或最终 SHA 结果，见[本轮验收](../review/phase-5-validation.md)。完整 Web 仍在 Phase 9，违约保存期限不因模型已建立而视为获批。
+Phase5的D V4/M1 V3、当日码签到、严格截止、锁等待跨截止、重复扫描/接收、停机补偿、签到抑制和违约原子释放已通过真实HTTP/PostgreSQL与可注入Clock验证，102项及实际升级结果见[历史Phase5验收](../review/phase-5-validation.md)。完整 Web 仍在 Phase 9，违约保存期限不因模型已建立而视为获批。
+
+## Phase 6 当前实现与明确依赖
+
+M2追加V2四表classroom_request、approval_step、approval_action、classroom_event；D仍V4/M1 V3/M3 V1，旧迁移不改写。D36/M1 10/M2 6操作。D本人room-scopes要求当前classroom:approve，ROOM_ADMIN/DEPARTMENT_ADMIN可显式分配房间；两角色均移除则清除范围，D空间维护仍按原ROOM_ADMIN/系统管理员规则，部门范围不扩大空间或取码权限。不新增部门模型或seed用户。
+
+M2通过真实D HTTP验证身份/权限/范围和启用CLASSROOM，无D签名秘密/跨schema SQL。SUBMITTED等待ROOM_ADMIN，第一次批准APPROVING激活DEPARTMENT_ADMIN，第二次仅APPROVED_PENDING_SYNC。两级要求当前对应角色/权限/范围，禁止自批及同一人两级，无SYSTEM_ADMIN隐式覆盖。每级激活默认24小时并封顶startAt，记录锁后复核Clock；未完成审批到期AUTO_CANCELLED。只允许本人取消SUBMITTED/APPROVING且期限前。
+
+同步通过独立M1_CLASSROOM_TOKEN真实POST M1 room-blocks，来源classroom-request:ID；30秒持久lease/令牌、3次总尝试、网络/5xx退避30/60秒、4xx/坏回执终止。两个30秒任务/池2，HTTP不持本地锁，迟到回执核对状态/令牌。当前真实M1接口属于Phase8尚未提供，直接403正确记SYNC_FAILED，不制造APPROVED或M1占用。客户端成功回执分支仅由明确外部响应夹具验证；批准后取消/到期释放/未知提交补偿与真实封房仍留Phase8。
+
+完整clean reactor130项通过，运行升级与最终SHA证据见[Phase6验收](../review/phase-6-validation.md)。早期Phase0–5文字保留历史，不能把旧阶段未实现描述当作当前M2不存在，也不能把当前M2审批当作Phase8已完成。Phase6结束等待Phase7，完整Web在Phase9。
