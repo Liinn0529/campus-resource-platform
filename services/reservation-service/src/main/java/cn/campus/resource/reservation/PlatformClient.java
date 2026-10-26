@@ -4,10 +4,12 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
+import com.fasterxml.jackson.databind.JsonNode;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +20,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.client.ResourceAccessException;
 
 @Component
 class PlatformClient {
@@ -27,6 +30,27 @@ class PlatformClient {
             @JsonProperty(required = true) @JsonSetter(nulls = Nulls.FAIL) boolean hasPowerOutlet,
             @JsonProperty(required = true) boolean enabled) { }
     record Settings(int maxReservationHours) { }
+    private record CodeWrite(long roomId, String code) {
+        @Override public String toString() { return "CodeWrite[roomId=" + roomId + ",code=redacted]"; }
+    }
+    private record Verification(JsonNode valid) { }
+    private record NotificationWrite(String sourceRefId, long userId, long reservationId, long roomId,
+            Instant startAt, String kind, Instant dueAt, Instant expiresAt) { }
+    private record NotificationReceipt(long id, long userId, String sourceModule, String sourceRefId,
+            long reservationId, long roomId, Instant startAt, String kind, Instant dueAt,
+            Instant expiresAt, Instant createdAt) { }
+
+    static final class NotificationFailure extends RuntimeException {
+        private final boolean retryable;
+        private final String code;
+        NotificationFailure(boolean retryable, String code) {
+            super("Notification acceptance failed: " + code);
+            this.retryable = retryable;
+            this.code = code;
+        }
+        boolean retryable() { return retryable; }
+        String code() { return code; }
+    }
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record Envelope<T>(T data, String requestId) { }
 
@@ -104,6 +128,59 @@ class PlatformClient {
                 new ParameterizedTypeReference<Envelope<Settings>>() { }, false);
         if (settings.maxReservationHours() <= 0) { throw unavailable(); }
         return settings;
+    }
+
+    boolean verifyCheckinCode(long roomId, String code) {
+        try {
+            var response = http.post().uri("/internal/v1/checkin-codes/verify")
+                    .headers(headers -> headers.setBearerAuth(serviceToken)).body(new CodeWrite(roomId, code))
+                    .retrieve().toEntity(new ParameterizedTypeReference<Envelope<Verification>>() { });
+            var body = response.getBody();
+            if (response.getStatusCode().value() != 200 || body == null || body.data() == null
+                    || body.data().valid() == null || !body.data().valid().isBoolean()
+                    || !validRequestId(body.requestId())) {
+                throw unavailable();
+            }
+            return body.data().valid().booleanValue();
+        } catch (RestClientException failure) {
+            throw unavailable();
+        }
+    }
+
+    long notifyReminder(long reminderId, long userId, long reservationId, long roomId, Instant startAt,
+            String kind, Instant dueAt, Instant expiresAt) {
+        String sourceRef = "reservation-reminder:" + reminderId;
+        try {
+            var response = http.post().uri("/internal/v1/notifications")
+                    .headers(headers -> headers.setBearerAuth(serviceToken))
+                    .body(new NotificationWrite(sourceRef, userId, reservationId, roomId, startAt, kind, dueAt, expiresAt))
+                    .retrieve().toEntity(new ParameterizedTypeReference<Envelope<NotificationReceipt>>() { });
+            var body = response.getBody();
+            if ((response.getStatusCode().value() != 200 && response.getStatusCode().value() != 201)
+                    || body == null || body.data() == null || !validRequestId(body.requestId())) {
+                throw new NotificationFailure(false, "PLATFORM_INVALID_RESPONSE");
+            }
+            var accepted = body.data();
+            if (accepted.id() <= 0 || accepted.userId() != userId || !"M1".equals(accepted.sourceModule())
+                    || !sourceRef.equals(accepted.sourceRefId()) || accepted.reservationId() != reservationId
+                    || accepted.roomId() != roomId || !startAt.equals(accepted.startAt())
+                    || !kind.equals(accepted.kind()) || !dueAt.equals(accepted.dueAt())
+                    || !expiresAt.equals(accepted.expiresAt()) || accepted.createdAt() == null) {
+                throw new NotificationFailure(false, "PLATFORM_INVALID_RESPONSE");
+            }
+            return accepted.id();
+        } catch (RestClientResponseException failure) {
+            throw new NotificationFailure(failure.getStatusCode().is5xxServerError(),
+                    "PLATFORM_HTTP_" + failure.getStatusCode().value());
+        } catch (ResourceAccessException failure) {
+            throw new NotificationFailure(true, "PLATFORM_NETWORK_ERROR");
+        } catch (RestClientException failure) {
+            throw new NotificationFailure(false, "PLATFORM_INVALID_RESPONSE");
+        }
+    }
+
+    private boolean validRequestId(String value) {
+        return value != null && !value.isBlank() && value.length() <= 64;
     }
 
     private List<Seat> seats(long roomId, Long seatId, Boolean power, int limit, int offset) {

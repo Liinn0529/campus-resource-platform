@@ -2,11 +2,11 @@
 
 ## 当前阶段与依据
 
-Phase 0–3 已交付，用户在 Phase 3 交付后回复“继续”，现已授权 Phase 4：M1 基础预约。Phase 4 完成后必须停止，等待用户明确确认才能进入 Phase 5。一次只完成一个 Phase；上传 GitHub、创建 PR 或审核文档均不等于批准下一阶段。
+Phase 0–4 已交付，用户在 Phase 4 交付后回复“继续”，现已授权 Phase 5：M1 签到、提醒和违约。Phase 5 完成后必须停止，等待用户明确确认才能进入 Phase 6。一次只完成一个 Phase；上传 GitHub、创建 PR 或审核文档均不等于批准下一阶段。
 
 需求依据是 [原始执行文档](docs/requirements/CODEX_EXECUTION_PROMPT.md)，规范化需求见 [REQUIREMENTS](docs/requirements/REQUIREMENTS.md)，状态见 [TRACEABILITY](docs/requirements/TRACEABILITY.md)。保留未完成需求，不以删除条目消除欠账。发现冲突或歧义，记录并交由人工确认，不悄悄改写需求。
 
-Phase 0–3 的治理、工程、数据库与 D 公共层保留。当前 Phase 4 允许 M1 房间/座位/可用性查询、预约创建/取消/本人历史/再预约、房间锁/占用账本/实际预约事件、真实 D HTTP 身份与主数据调用及相关测试/契约。禁止提前实现签到、提醒、违约、审批、工单、M2/M3 占用接口或 CI/CD。schema 与公共契约以具体可运行草稿 PR 人工 review；未定业务政策明确记录方案，不将后续阶段标为完成。
+Phase 0–4 的治理、工程、数据库、D 公共层与 M1 基础预约保留。当前 Phase 5 允许真实房间码签到、T−15/T+10 站内提醒、T+15 NO_SHOW、违约记录、对应占用释放、持久调度/去重、D 真实站内收件箱及相关测试和契约。禁止提前实现审批、工单、M2/M3 占用接口、完整业务 Web 或 CI/CD。不私加封号/积分，不把站内持久接收称为邮件送达或用户已读，不擅自增加 COMPLETED 自动转换。schema 与公共契约以具体可运行草稿 PR 人工 review；未定业务政策明确记录方案，不将后续阶段标为完成。
 
 ## 工程原则
 

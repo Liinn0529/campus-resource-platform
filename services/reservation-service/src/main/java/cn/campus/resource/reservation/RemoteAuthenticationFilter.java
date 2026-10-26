@@ -23,7 +23,7 @@ class RemoteAuthenticationFilter extends OncePerRequestFilter {
 
     static boolean publicApi(String path) {
         return path.equals("/api/v1/reservations") || path.startsWith("/api/v1/reservations/")
-                || path.startsWith("/api/v1/reservation/");
+                || path.startsWith("/api/v1/reservation/") || path.equals("/api/v1/violations");
     }
 
     @Override

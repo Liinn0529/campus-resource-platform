@@ -8,6 +8,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -161,6 +162,67 @@ class PlatformClientBoundaryTest {
         rejected(() -> client.seats(1, false, 100, 0), HttpStatus.SERVICE_UNAVAILABLE, "PLATFORM_UNAVAILABLE");
         rejected(() -> client.seats(1, null, 100, 0), HttpStatus.SERVICE_UNAVAILABLE, "PLATFORM_UNAVAILABLE");
         rejected(() -> client.seat(1, 10), HttpStatus.SERVICE_UNAVAILABLE, "PLATFORM_UNAVAILABLE");
+    }
+
+    @Test
+    void verifiesTheCodeThroughRealHttpAndRejectsMissingOrNullResults() {
+        override.set(new Reply(200, envelope("{\"valid\":true}"), null));
+        assertThat(client.verifyCheckinCode(1, "ABCDEFGH")).isTrue();
+        assertThat(observed.peek().path()).isEqualTo("/internal/v1/checkin-codes/verify");
+        assertThat(observed.peek().authorization()).isEqualTo("Bearer " + SERVICE_TOKEN);
+        override.set(new Reply(200, envelope("{\"valid\":false}"), null));
+        assertThat(client.verifyCheckinCode(1, "ABCDEFGH")).isFalse();
+        for (String response : List.of("{}", "{\"valid\":null}", "{\"valid\":\"true\"}", "{\"valid\":1}", "null")) {
+            override.set(new Reply(200, envelope(response), null));
+            rejected(() -> client.verifyCheckinCode(1, "ABCDEFGH"), HttpStatus.SERVICE_UNAVAILABLE,
+                    "PLATFORM_UNAVAILABLE");
+        }
+        override.set(new Reply(500, errorBody(), null));
+        rejected(() -> client.verifyCheckinCode(1, "ABCDEFGH"), HttpStatus.SERVICE_UNAVAILABLE,
+                "PLATFORM_UNAVAILABLE");
+    }
+
+    @Test
+    void acceptsOnlyAReceiptMatchingTheNotificationSourceAndRecipient() {
+        String notification = """
+                {"id":99,"userId":7,"sourceModule":"M1","sourceRefId":"reservation-reminder:4",
+                 "reservationId":8,"roomId":1,"startAt":"2026-11-01T01:00:00Z","kind":"CHECKIN_FIRST",
+                 "dueAt":"2026-11-01T00:45:00Z","expiresAt":"2026-11-01T01:10:00Z",
+                 "createdAt":"2026-11-01T00:45:00Z"}
+                """;
+        for (int status : List.of(200, 201)) {
+            override.set(new Reply(status, envelope(notification), null));
+            assertThat(notifyFixture()).isEqualTo(99);
+        }
+        for (String invalid : List.of(notification.replace("\"userId\":7", "\"userId\":9"),
+                notification.replace("reservation-reminder:4", "reservation-reminder:5"),
+                notification.replace("\"id\":99", "\"id\":0"), "null", "{}")) {
+            override.set(new Reply(200, envelope(invalid), null));
+            var failure = assertThrows(PlatformClient.NotificationFailure.class, this::notifyFixture);
+            assertThat(failure.retryable()).isFalse();
+            assertThat(failure.code()).isEqualTo("PLATFORM_INVALID_RESPONSE");
+        }
+    }
+
+    @Test
+    void notificationDeliveryRetriesOnlyNetworkAndServerErrorsWithoutExposingUpstreamBodies() {
+        for (int status : List.of(400, 401, 403, 409, 422, 500, 503)) {
+            override.set(new Reply(status, errorBody(), null));
+            var failure = assertThrows(PlatformClient.NotificationFailure.class, this::notifyFixture);
+            assertThat(failure.retryable()).isEqualTo(status >= 500);
+            assertThat(failure.code()).isEqualTo("PLATFORM_HTTP_" + status);
+            assertThat(failure.getMessage()).doesNotContain(SERVICE_TOKEN, USER_TOKEN);
+        }
+        override.set(new Reply(302, envelope("{}"), origin + "/redirect-target"));
+        assertThat(assertThrows(PlatformClient.NotificationFailure.class, this::notifyFixture).retryable()).isFalse();
+        assertThat(redirectRequests.get()).isZero();
+        server.stop(0);
+        assertThat(assertThrows(PlatformClient.NotificationFailure.class, this::notifyFixture).retryable()).isTrue();
+    }
+
+    private long notifyFixture() {
+        return client.notifyReminder(4, 7, 8, 1, Instant.parse("2026-11-01T01:00:00Z"), "CHECKIN_FIRST",
+                Instant.parse("2026-11-01T00:45:00Z"), Instant.parse("2026-11-01T01:10:00Z"));
     }
 
     private void rejected(Executable call, HttpStatus status, String code) {

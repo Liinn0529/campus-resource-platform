@@ -1,6 +1,6 @@
-# Phase 3 平台 API 契约
+# 平台 API 契约（Phase 5 草稿）
 
-本文件描述 D 公共层的实际代码方案，完整机器契约为 [OpenAPI 3 JSON](../../contracts/openapi/platform.v1.json)。Phase 3 交付基础能力，Phase 4 增加内部房间目录及座位筛选；真实结果以阶段验证记录为准，不以静态契约代替运行验证或人工审阅。运行信息端点另见 [runtime.md](runtime.md)。本文共列 33 个方法/路径组合，不包含其他模块的预约、实际签到、审批、工单、通知投递或远程审计写入端点。
+本文件描述 D 公共层的实际代码方案，完整机器契约为 [OpenAPI 3 JSON](../../contracts/openapi/platform.v1.json)。Phase 3 交付基础能力，Phase 4 增加内部房间目录及座位筛选，Phase 5 增加真实 M1 提醒接收和本人站内收件箱；真实结果以阶段验证记录为准，静态契约不能代替运行验证或人工审阅。运行信息端点另见 [runtime.md](runtime.md)。本文共列 35 个方法/路径组合。预约与实际签到由 M1 决定；审批、工单及通用远程审计写入仍留后续。
 
 ## 地址、认证与响应
 
@@ -16,11 +16,11 @@
 | 401 | 缺少/失效 JWT 或内部身份：UNAUTHORIZED；登录与当前密码错误：AUTHENTICATION_FAILED |
 | 403 | 权限、角色或房间范围不符：FORBIDDEN |
 | 404 | USER_NOT_FOUND、ROLE_NOT_FOUND、BUILDING_NOT_FOUND、ROOM_NOT_FOUND、SEAT_NOT_FOUND、CHECKIN_CODE_NOT_FOUND、NOT_FOUND |
-| 409 | 唯一键等 DATA_CONFLICT、LAST_SYSTEM_ADMIN、SYSTEM_ADMIN_PERMISSIONS_FIXED、IDENTITY_CHANGED |
-| 422 | 未知角色/权限/房间引用或不符合管理规则：INVALID_REFERENCE_OR_VALUE |
+| 409 | 唯一键等 DATA_CONFLICT、LAST_SYSTEM_ADMIN、SYSTEM_ADMIN_PERMISSIONS_FIXED、IDENTITY_CHANGED；NOTIFICATION_SOURCE_CONFLICT |
+| 422 | 未知角色/权限/房间引用或不符合管理规则：INVALID_REFERENCE_OR_VALUE；通知为 NOTIFICATION_RECIPIENT_UNAVAILABLE / NOTIFICATION_INVALID_WINDOW |
 | 500 / 503 | 不返回异常详情：INTERNAL_ERROR / DATABASE_UNAVAILABLE |
 
-带分页的列表支持 limit 1–100、offset ≥0；用户/审计默认 limit=50，空间默认 100。排序及过滤见下面各组与 OpenAPI。输入中的密码为写入字段，不得放在 URL、查询字符串或日志中。新设密码必须非空白且为 12–72 个 UTF-8 字节，使用 BCrypt cost 12；登录密码最多 72 字节。
+带分页的列表支持 limit 1–100、offset ≥0；用户/审计/通知默认 limit=50，空间默认 100。排序及过滤见下面各组与 OpenAPI。输入中的密码为写入字段，不得放在 URL、查询字符串或日志中。新设密码必须非空白且为 12–72 个 UTF-8 字节，使用 BCrypt cost 12；登录密码最多 72 字节。
 
 ## 角色、范围与参考目录
 
@@ -36,7 +36,7 @@ V3 在所有环境加载七类固定角色和 14 项权限参考定义，初始�
 | PROPERTY_MANAGER | maintenance:assign、space:view、settings:view |
 | OPERATOR | space:view、settings:view |
 
-全部权限为以上集合，再加全局 user:manage、role:manage、audit:view、settings:manage。后续模块的权限名称只是参考目录，不表示预约、审批或派单接口已经实现。房间管理员默认没有任何房间范围；管理员显式分配后才能维护该房间。普通启用空间目录供有 space:view 的用户读取；管理目录按授权范围过滤，不能把普通查询权限当作修改权限。
+全部权限为以上集合，再加全局 user:manage、role:manage、audit:view、settings:manage。预约相关权限已用于 M1；审批和派单权限名称仍只是参考目录，不表示对应业务已经实现。房间管理员默认没有任何房间范围；管理员显式分配后才能维护该房间。普通启用空间目录供有 space:view 的用户读取；管理目录按授权范围过滤，不能把普通查询权限当作修改权限。
 
 local seed 保持五个演示用户，不为 DEPARTMENT_ADMIN、PROPERTY_MANAGER、OPERATOR 额外生成用户，也不暗中授予 demo_room_admin 房间范围。额外真实/测试业务账号应通过授权管理创建，不能扩充演示 seed。
 
@@ -93,13 +93,13 @@ Building 为 id/code/name；Room 另含 buildingId/type/enabled；Seat 为 id/ro
 | POST /api/v1/rooms/{id}/checkin-code | 确保今日记录存在后返回同样对象；首次和重复均为 200 | checkin-code:manage + 房间范围 |
 | GET /api/v1/audit-events | AuditEvent 数组，按 id 降序分页，可用 targetType 过滤 | SYSTEM_ADMIN + audit:view |
 
-最大连续预约时长存为正整数，D 仅维护和提供该值；M1 如何执行以及参数变化对既有预约的影响留 Phase 4。
+最大连续预约时长存为正整数，D 维护和提供该值；M1 每次新建/再预约读取当前快照，既有预约不随参数改写，详见[预约契约](reservation.md)。
 
-签到码日期由注入 Clock 和显式 `CAMPUS_BUSINESS_ZONE` 计算，本地为 Asia/Shanghai；客户端不能提交任意日期。每日每房间一条记录，由 `(room_id,date)` 主键保护。代码为 SecureRandom 生成的 8 位 `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` 字符，不含 I/O/0/1，不要求跨房间全局唯一。重复或并发 ensure 返回同一条记录且只产生一条创建审计。不提供同日轮换、QR 载荷、预约检查或实际签到。停用房间不能生成/读取有效码；学生不能取码。验证码和令牌均不得写入日志或审计。
+签到码日期由注入 Clock 和显式 `CAMPUS_BUSINESS_ZONE` 计算，本地为 Asia/Shanghai；客户端不能提交任意日期。每日每房间一条记录，由 `(room_id,date)` 主键保护。代码为 SecureRandom 生成的 8 位 `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` 字符，不含 I/O/0/1，不要求跨房间全局唯一。重复或并发 ensure 返回同一条记录且只产生一条创建审计。不提供同日轮换或 QR 载荷；预约资格与实际签到由 M1 的真实 HTTP 调用及房间锁事务决定。停用房间不能生成/读取有效码；学生不能取码。验证码和令牌均不得写入日志或审计。
 
 D 修改与审计同事务。AuditEvent 包含 id、actorUserId、sourceService、action、targetType、targetId、requestId、occurredAt，没有输入正文、密码、JWT 或签到码。targetType 过滤为 `[A-Z_]{1,32}`；审计应用身份不可 UPDATE/DELETE，查询由权限控制。审计保存期限仍未定，当前不提供清理或导出机制。
 
-## 私网内部接口（5 个操作）
+## 私网内部接口（6 个操作）
 
 以下请求只能在 backend 网络访问 `http://platform-service:8080`，公网/本地浏览器网关对 `/internal` 始终返回 404。Header 同样使用 `Authorization: Bearer <opaque service secret>`，但它是与用户 JWT 完全分开的秘密和安全链；用户 JWT 不能替代服务身份。
 
@@ -110,9 +110,35 @@ D 修改与审计同事务。AuditEvent 包含 id、actorUserId、sourceService�
 | GET /internal/v1/rooms/{roomId}/seats | 座位主数据分页；enabledOnly、hasPowerOutlet、seatId 可选筛选 | 三个服务身份 |
 | GET /internal/v1/settings | 读取最大预约时长 | 三个服务身份 |
 | POST /internal/v1/checkin-codes/verify | `{roomId,code}` → `{valid:boolean}` | 仅 reservation-service |
+| POST /internal/v1/notifications | 最小提醒载荷 → 已持久化 Notification；首次201、相同重复200 | 仅 reservation-service |
 
-三个秘密分别对应 `PLATFORM_RESERVATION_TOKEN`、`PLATFORM_CLASSROOM_TOKEN`、`PLATFORM_MAINTENANCE_TOKEN`，必须独立且至少 32 个 UTF-8 字节。D 根据受验证的凭据判断调用方，不信任请求体自报 module。语法正确但房间不存在/停用、当日未生成码或不匹配均返回 200、valid=false；非法 ID 或不是合法 8 位格式的 code 返回 400。校验不生成记录、不泄露正确码，也不校验预约或用户归属；这些属于 M1 的实际签到阶段。
+三个秘密分别对应 `PLATFORM_RESERVATION_TOKEN`、`PLATFORM_CLASSROOM_TOKEN`、`PLATFORM_MAINTENANCE_TOKEN`，必须独立且至少 32 个 UTF-8 字节。D 根据受验证的凭据判断调用方，不信任请求体自报 module。语法正确但房间不存在/停用、当日未生成码或不匹配均返回 200、valid=false；非法 ID 或不是合法 8 位格式的 code 返回 400。校验不生成记录、不泄露正确码，也不校验预约或用户归属；M1 Phase 5 使用该真实结果再校验本人预约、签到窗口和账本。
 
 内部目录的 limit 为 1–100（默认 100），offset≥0；调用方逐页读取，不能把第一页当成完整数据。座位默认仍包含停用主数据，以保留原契约；`enabledOnly=true` 时只返回启用房间内的启用座位。`hasPowerOutlet=true/false` 按真实插座标记筛选，`seatId` 是房间内的精确正整数 ID；全部筛选在 SQL 的 LIMIT/OFFSET 前执行。禁用房间在 enabledOnly 模式返回空座位列表，未知房间返回 404。D 只提供主数据快照，不返回或判断 M1 占用状态。
 
-通知和跨服务审计写入尚无可调用实现。后续应先明确调用身份、字段最小化、幂等/投递状态和保存政策，再增加有真实行为的契约，不能返回空成功表示已经送达或审计完成。
+## 站内提醒收件箱（1 个公开操作）
+
+`GET /api/v1/notifications` 要求用户 JWT 和 `reservation:view:self`，只返回当前认证用户的记录，SYSTEM_ADMIN 同样没有跨用户覆盖。支持 limit（默认50、1–100）和 offset（默认0、非负），按 id 降序；`data` 是 Notification 数组。历史消息保留，`expiresAt` 是原提醒的业务有效窗口，不代表收件箱自动删除时间。
+
+Notification 字段为 `id`、`userId`、`sourceModule`（固定 M1）、`sourceRefId`、`reservationId`、`roomId`、`startAt`、`kind`、`dueAt`、`expiresAt`、`createdAt`。时间序列化为 UTC Instant；createdAt 来自 D 接收时的 Clock。kind 为 `CHECKIN_FIRST` 或 `CHECKIN_SECOND`，客户端可以据此展示对应的确定性提醒。没有任意消息正文、签到码、密码或额外联系方式字段。
+
+当前能力是可查询的真实站内持久记录。D 的成功响应证明消息已经进入本人收件箱；未提供用户已读回执、邮件、短信或推送渠道，不能把接收等同于这些渠道送达。完整业务 Web 收件箱属于 Phase 9。
+
+## M1 提醒接收、幂等与审计
+
+`POST /internal/v1/notifications` 只接受 reservation-service 的专属 opaque 凭据。用户 JWT、M2/M3 凭据均不能调用；公共网关继续隐藏 internal。JSON 必填字段为：
+
+| 字段 | 约束 |
+|---|---|
+| sourceRefId | `[A-Za-z0-9][A-Za-z0-9:_-]{0,63}`，实际 M1 使用 `reservation-reminder:<持久提醒ID>` |
+| userId、reservationId、roomId | 正整数；M1 提供的最小逻辑关联，不跨 schema 外键或 SQL |
+| startAt、dueAt、expiresAt | 必须带 offset，转换成 Instant 比较 |
+| kind | CHECKIN_FIRST 或 CHECKIN_SECOND |
+
+FIRST 的 dueAt 必须为 startAt−15分钟、expiresAt 为 startAt+10分钟；SECOND 必须分别为 startAt+10分钟和 startAt+15分钟。D 校验这些字段关系；M1 负责当前预约资格和实际发送窗口，D 不反向调用 M1。畸形 JSON、缺失/非法/未知字段为400；不符合窗口关系为422 `NOTIFICATION_INVALID_WINDOW`。这里不接受任意通知文本或客户端自报 sourceModule。
+
+新来源 `(M1,sourceRefId)` 要求接收人存在且启用，失败为422 `NOTIFICATION_RECIPIENT_UNAVAILABLE`。首次返回201完整 Notification；记录与 `NOTIFICATION_ACCEPTED` 审计同一 D 事务提交，审计 actor 为空、source_service 为 reservation-service。相同来源、相同接收人/预约/房间/kind/各时间返回200原记录和原ID，即使随后用户停用也保留已经接收的事实；不重复写消息或接受审计。时间按 Instant 比较，因此等价 offset 不算变更。来源被用于不同载荷时返回409 `NOTIFICATION_SOURCE_CONFLICT`。
+
+M1 持久队列使用相同 sourceRefId 处理超时后回执未知和进程恢复，D 唯一约束裁决并发重复。M1 只有在验证完整匹配回执后记录 ACCEPTED；业务重试、过期、在途限制见[预约契约](reservation.md#提醒调度投递与恢复)。D 的记录不参与决定预约状态。
+
+通知与违约保存期限、删除和申诉政策仍待人工 review，当前保留不能解释为批准永久保存。当前没有通用跨服务审计写入端点；D 只为自己的真实通知接收写审计，M1 的签到/NO_SHOW 事件由其本地事务记录。

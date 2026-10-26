@@ -9,6 +9,8 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -101,6 +103,7 @@ abstract class ReservationApiTestSupport {
         properties.add("campus.platform.base-url", () -> PLATFORM_URL);
         properties.add("campus.platform.service-token", () -> RESERVATION_TOKEN);
         properties.add("campus.business-zone", () -> "Asia/Shanghai");
+        properties.add("campus.reservation.scheduler-enabled", () -> "false");
     }
 
     @Autowired protected TestRestTemplate http;
@@ -128,6 +131,18 @@ abstract class ReservationApiTestSupport {
 
     protected ResponseEntity<Map> platformRequest(HttpMethod method, String path, Object body, String token) {
         return exchange(PLATFORM_HTTP, method, PLATFORM_URL + path, body, token);
+    }
+
+    protected void clearReservationRows() {
+        for (String table : List.of("reminder", "checkin", "violation", "reservation_event",
+                "seat_occupancy", "seat_reservation", "room_gate")) {
+            jdbc.update("DELETE FROM reservation." + table);
+        }
+    }
+
+    protected Connection platformMigratorConnection() throws SQLException {
+        return new DriverManagerDataSource(DatabaseTestSupport.jdbcUrl(DATABASE, "platform"),
+                "platform_migrator", DatabaseTestSupport.migratorPassword("platform")).getConnection();
     }
 
     protected long platformUserId(String username) {

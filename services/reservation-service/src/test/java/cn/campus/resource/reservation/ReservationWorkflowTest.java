@@ -313,10 +313,7 @@ class ReservationWorkflowTest extends ReservationApiTestSupport {
     }
 
     private void clearWorkflowRows() {
-        jdbc.update("DELETE FROM reservation.reservation_event");
-        jdbc.update("DELETE FROM reservation.seat_occupancy");
-        jdbc.update("DELETE FROM reservation.seat_reservation");
-        jdbc.update("DELETE FROM reservation.room_gate");
+        clearReservationRows();
     }
 
     private int count(String table) {
