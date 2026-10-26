@@ -1,14 +1,14 @@
-# 需求追踪矩阵（当前 Phase 4）
+# 需求追踪矩阵（当前 Phase 5）
 
 来源与需求正文见 [REQUIREMENTS.md](REQUIREMENTS.md)，原文见 [CODEX_EXECUTION_PROMPT.md](CODEX_EXECUTION_PROMPT.md)。每个需求 ID 对应一行；保留原文要求的 `ID | Requirement | Module | API/Page | Test | Status` 六列，并增加 Source、Phase。
 
-**Phase 4 代码与首次本地运行验收通过，最终干净版本重建待核对。** Phase 0–3 历史结果保留。本轮 M1 新 V2 四表/8 操作，真实 D 身份/元数据/参数 HTTP；D 扩展内部目录至 33 操作。完整 reactor 69 项通过后新增 6 项客户端边界并重跑 M1 最终子集 28 项，当前 Surefire 共 75 个后端测试通过、0 失败/错误/跳过。真实 D JAR 子进程与 PostgreSQL 覆盖首次并发锁、时间/参数、所有来源冲突、取消/再预约、本人隔离及失败回滚；错误响应夹具仅验证外部边界。首次 Compose 保留原卷升级至 D V3/M1 V2、七容器健康、真实网关公共层回归与预约流程、数据库隔离/账本/事件和原演示计数/五用户密码保留检查通过；最终干净 GitHub 版本重建另记于 [Phase 4 验证](../review/phase-4-validation.md)，未执行结果不预填。实际签到/提醒/违约、M2/M3 业务与占用 HTTP、完整 Web、CI/CD 和云部署未实现；schema/公共契约仍待草稿 PR 人工 review。
+**Phase 5 功能与首次本地运行验收通过，最终干净版本重建待核对。** Phase 0–4 历史保留，本轮D V4/M1 V3增加真实房间码签到、持久站内提醒、T+15 NO_SHOW、唯一违约/精确释放；当前D35/M1 10操作，具体方案交草稿PR人工review。完整clean reactor102项、前端6项、原卷升级、网关/CORS/日志已通过；最终干净SHA/镜像核验以[Phase 5 验证](../review/phase-5-validation.md)实际记录为准；审批、工单、完整Web、M2/M3占用写接口和CI/CD仍未完成。
 
-状态语义：TODO=尚未实现/验证；PARTIAL=部分交付且仍需验收；BLOCKED=无法继续且已记录原因；DONE=阶段适用验收完成且有真实证据。DONE 不代表人工已批准 schema、合并 PR 或下一阶段；持续约束不因文档或测试通过而关闭。本轮 M1 基础功能按代码与首次 Compose 适用验收更新为 DONE，最终干净 GitHub 版本重建仍在交付记录中单独核对，未将 CI 或后续业务标为完成。
+状态语义：TODO=尚未实现/验证；PARTIAL=部分交付且仍需验收；BLOCKED=无法继续且已记录原因；DONE=阶段适用验收完成且有真实证据。DONE 不表示人工已批准schema、合并PR或下一阶段。本轮已获真实证据的阶段项逐项晋升；正常COMPLETED、完整Web与违约保留政策仍保持PARTIAL，不把本地验证称为GitHub CI。
 
-OQ-01..15 全部保留。Phase 4 对 OQ-01/02/07/10/12/13/14 给出具体时间/取消/账本/HTTP/响应方案；签到、违约、跨模块释放/重试与生命周期仍未定，未删除后续需求。
+OQ-01..15全部保留。Phase 5对签到窗口、NO_SHOW、站内入箱/恢复与最小违约可见范围给出具体草案，正常COMPLETED、保存期限、补签到、M2/M3释放和组织政策仍未定；不删除后续需求。
 
-验收证据：历史 [Phase 0](../review/phase-0-validation.md)、[Phase 1](../review/phase-1-validation.md)、[Phase 2](../review/phase-2-validation.md)、[Phase 3](../review/phase-3-validation.md)记录；当前 [Phase 4 计划](../plans/phase-4.md)、[预约 API](../api/reservation.md)、[平台 API](../api/platform.md)、[预约 OpenAPI](../../contracts/openapi/reservation.v1.json)、[平台 OpenAPI](../../contracts/openapi/platform.v1.json)与[数据/测试边界](../architecture/DATA_OWNERSHIP.md#7-当前验证与后续边界)。本轮位于 `feature/phase-4-reservations`，基于 Phase 3 最终提交；已验证分项分别上传 GitHub，[草稿 PR #5](https://github.com/Liinn0529/campus-resource-platform/pull/5)人工 review，不自动合并。首个代码分项 [6d98a875](https://github.com/Liinn0529/campus-resource-platform/commit/6d98a8752f9f5babb4e1f28b178d3dacaf798bf9) 已上传，后续修复按验证分项继续提交。真实测试入口 `scripts/test-backend.sh`，运行验收 `scripts/smoke-phase-4.py`，数据库检查 `scripts/check-database.py --phase4`。
+验收证据：历史[Phase 0](../review/phase-0-validation.md)、[Phase 1](../review/phase-1-validation.md)、[Phase 2](../review/phase-2-validation.md)、[Phase 3](../review/phase-3-validation.md)、[Phase 4](../review/phase-4-validation.md)保留；当前[Phase 5计划](../plans/phase-5.md)与[本轮验收](../review/phase-5-validation.md)、[平台API](../api/platform.md)、[预约API](../api/reservation.md)及对应OpenAPI同步。本轮分支feature/phase-5-checkin基于Phase 4最终edf454a8，验证后按可运行分项上传，保持堆叠草稿人工review。
 
 ## Phase 0 文档交付
 
@@ -61,7 +61,7 @@ OQ-01..15 全部保留。Phase 4 对 OQ-01/02/07/10/12/13/14 给出具体时间/
 
 | ID | Requirement | Module | API/Page | Test | Status | Source | Phase |
 |---|---|---|---|---|---|---|---|
-| REQ-DATA-001 | 建立 room_gate、seat_reservation、seat_occupancy、checkin、violation、reservation_event；不能只靠 seat.status 表示全部业务状态。 | M1 | reservation V2 四表 | 已建 room_gate/seat_reservation/seat_occupancy/reservation_event 并真实测试；checkin/violation 留 Phase5 | PARTIAL | §七 | 2/4/5 |
+| REQ-DATA-001 | 建立 room_gate、seat_reservation、seat_occupancy、checkin、violation、reservation_event；不能只靠 seat.status 表示全部业务状态。 | M1 | M1 V2/V3七表 | D4/M1 V3实际迁移和102项测试通过；M1七表、唯一签到/违约、来源账本和事件已验证 | DONE | §七 | 2/4/5 |
 | REQ-DATA-002 | seat_occupancy 完整保留附录 B 的 11 个字段、可空性及来源枚举，能够追溯不可用来源。 | M1 | reservation V2 seat_occupancy | 真实 PostgreSQL 验证完整11字段、nullable seat/end、三来源、ACTIVE/RELEASED与释放信息；事件/账本一致性测试通过 | DONE | §七 | 2/4 |
 | REQ-DATA-003 | 建立 room_gate(room_id PRIMARY KEY)，房间级互斥所需行必须可获取。 | M1 | reservation V2 room_gate; ReservationMapper | room_id 主键；事务INSERT ON CONFLICT后FOR UPDATE，首次同房间同座位并发仅一成功，真实锁竞争测试通过 | DONE | §八 | 2/4 |
 | REQ-DATA-004 | 占用来源具有 (source_module, source_ref_id, source_type) 唯一约束。 | M1 | seat_occupancy occupancy_source_unique | V2 保留来源三元组唯一且取消不删记录、再预约新来源；M2/M3 幂等同/异载荷HTTP语义仍留Phase8 | PARTIAL | §九 | 2/8 |
@@ -83,7 +83,7 @@ OQ-01..15 全部保留。Phase 4 对 OQ-01/02/07/10/12/13/14 给出具体时间/
 | REQ-D-003 | 管理楼宇、教室、自习室与座位主数据，管理员可维护空间。 | D | SpaceController/Service; buildings/rooms/seats | 已执行：CommonResourcesTest 管理员新建/修改/启停楼宇房间座位、关联/唯一键、学生/跨房间拒绝通过；本阶段无硬删除 | DONE | §五.1; Phase 3 | 3 |
 | REQ-D-004 | 管理系统参数，含最大连续预约时长；M1 通过约定 API 使用参数。 | D/M1 | D settings API; M1 PlatformClient.settings/TimeRules | 真实 D 默认4、HTTP修改当前参数为2后M1新建按新快照拒绝超长，已有预约不改写；测试通过，具体政策待审 | DONE | §五.1、十一; Phase 3 | 3/4 |
 | REQ-D-005 | 每房间每天生成 6–8 位随机字符签到码；提供校验所需能力，可生成 QR Code。 | D | GET/POST /api/v1/rooms/{id}/checkin-code; internal verify | 已执行：每日 8 位随机码、room/date 唯一、Clock 上海日界、并发同条/单审计及 M1-only 校验测试通过；不含实际签到，QR 可选未实现 | DONE | §五.1、十二; Phase 3 | 3 |
-| REQ-D-006 | 提供通知接口，供 M1 提醒调用；实际渠道、投递状态和去重策略待确认，不用假通知宣称送达。 | D/M1 | 通知 API（待定义） | 计划，未执行：真实渠道与投递失败验证（待定） | TODO | §五.1、十一 | 3 契约; 5 实现 |
+| REQ-D-006 | 提供通知接口，供 M1 提醒调用；实际渠道、投递状态和去重策略待确认，不用假通知宣称送达。 | D/M1 | D POST/internal/v1/notifications; GET/api/v1/notifications; M1 reminder | 真实D站内接收/本人读取、来源幂等冲突、未知回执重放/有限尝试测试通过；仅持久入箱，不称邮件/已读 | DONE | §五.1、十一 | 3 契约; 5 实现 |
 | REQ-D-007 | 提供操作审计，支持授权查询；业务事件与公共审计之间通过 HTTP 契约关联。 | D | AuditService/Mapper; GET /api/v1/audit-events | D 修改/审计同事务、授权查询、requestId 关联和 app UPDATE/DELETE 拒绝测试已通过；跨服务事件与公共审计的 HTTP 关联仍留后续 | PARTIAL | §五.1; Phase 3 | 3 |
 | REQ-D-008 | 每个服务都提供 health 与 version/info；D 的职责列表不替代其他服务自身端点。 | D/M1/M2/M3 | GET /actuator/health; GET /actuator/info | 已执行：四服务真实 HTTP 测试，见 phase-1-backend.md | DONE | §五.1、二十八 | 1 |
 
@@ -99,12 +99,12 @@ OQ-01..15 全部保留。Phase 4 对 OQ-01/02/07/10/12/13/14 给出具体时间/
 | REQ-M1-006 | 提供预约取消并释放对应占用；允许取消的状态及时间边界须先明确，不能臆造。 | M1 | POST /api/v1/reservations/{id}/cancel | 本人CREATED开始前取消/释放、重复幂等、开始时拒绝与单事件真实测试通过；具体方案待review；首次Compose真实网关/数据库验收通过，最终干净版本重建另记 | DONE | §五.2、十一; Phase 4 | 4 |
 | REQ-M1-007 | 提供当前预约、预约详情和历史预约查询；个人范围由后端权限限制。 | M1 | GET /api/v1/reservations?view=current 或 history; /{id} | 真实HTTP当前/取消或结束历史、本人详情及其他学生/管理员404测试通过；首次Compose真实网关/数据库验收通过，最终干净版本重建另记 | DONE | §五.2、十一; Phase 4 | 4 |
 | REQ-M1-008 | 可再次预约历史座位，创建新预约时仍执行时段、权限、参数和冲突检查。 | M1 | POST /api/v1/reservations/{id}/rebook | 真实HTTP历史新ID/rebookOf、新来源及当前元数据/参数/时段/冲突检查通过；首次Compose真实网关/数据库验收通过，最终干净版本重建另记 | DONE | §五.2、十一; Phase 4 | 4 |
-| REQ-M1-009 | 预约状态限定为 CREATED、CANCELLED、CHECKED_IN、NO_SHOW、COMPLETED；完整转换守卫及完成触发规则待确认。 | M1 | seat_reservation V2; cancel/rebook guards | 约束保留五状态，本轮仅CREATED/CANCELLED与合法取消/历史再预约；CHECKED_IN/NO_SHOW/COMPLETED转换留Phase5 | PARTIAL | §十一 | 4/5 |
-| REQ-M1-010 | 以预约开始时间 T 为基准：T−15min 第一次提醒、T+10min 第二次提醒、T+15min 未签到判 NO_SHOW。 | M1/D | 定时任务 / 通知 API | 计划，未执行：注入 Clock 的时间边界测试 | TODO | §十一; Phase 5 | 5 |
-| REQ-M1-011 | NO_SHOW 处置需结束预约有效性、释放 occupancy、新增 violation、新增 audit/event；最终持久状态与“取消预约”表述歧义见 OQ-01。 | M1 | NO_SHOW 处理 | 计划，未执行：状态、占用、违约、事件联合验证 | TODO | §十一; Phase 5 | 5 |
-| REQ-M1-012 | 所有相关时间逻辑使用可注入 Clock，测试不得依赖真实等待或系统当前时间。 | M1 | TimeRules; ReservationService; 注入Clock | 基础预约/取消/历史已用可注入Clock并固定边界测试；提醒/签到/违约调度留Phase5 | PARTIAL | §十一; Phase 5 | 5 |
-| REQ-M1-013 | Web 输入签到码后校验 room、reservation 再完成签到；签到结果由后端确定。 | M1/D | 签到 API（待定义）; 预约详情 | 计划，未执行：正确码、错误房间、非本人预约验证 | TODO | §十二; Phase 5 | 5 |
-| REQ-M1-014 | 第一版签到不使用 GPS、人脸识别、蓝牙、NFC。 | M1/Web | 签到 UI / 依赖 | 计划，未执行：页面与依赖范围审查 | TODO | §十二 | 5 |
+| REQ-M1-009 | 预约状态限定为 CREATED、CANCELLED、CHECKED_IN、NO_SHOW、COMPLETED；完整转换守卫及完成触发规则待确认。 | M1 | M1状态守卫; checkin/NO_SHOW | 本轮实现CHECKED_IN/NO_SHOW及合法守卫，正常COMPLETED触发未定，保持PARTIAL | PARTIAL | §十一 | 4/5 |
+| REQ-M1-010 | 以预约开始时间 T 为基准：T−15min 第一次提醒、T+10min 第二次提醒、T+15min 未签到判 NO_SHOW。 | M1/D | LifecycleService/Scheduler; reminder; D notification | T−15/T+10提醒与T+15 NO_SHOW真实HTTP/PostgreSQL+注入Clock验证，独立30秒任务和持久去重恢复通过 | DONE | §十一; Phase 5 | 5 |
+| REQ-M1-011 | NO_SHOW 处置需结束预约有效性、释放 occupancy、新增 violation、新增 audit/event；最终持久状态与“取消预约”表述歧义见 OQ-01。 | M1 | LifecycleService; violation; 系统事件 | NO_SHOW/精确来源释放/唯一违约/actor=null系统事件同事务，重复/并发与异常回滚验证通过 | DONE | §十一; Phase 5 | 5 |
+| REQ-M1-012 | 所有相关时间逻辑使用可注入 Clock，测试不得依赖真实等待或系统当前时间。 | M1 | TimeRules/ReservationService/LifecycleService; Clock | 基础预约及签到/提醒/截止/锁等待均使用注入Clock，真实HTTP测试无需等待15分钟 | DONE | §十一; Phase 5 | 5 |
+| REQ-M1-013 | Web 输入签到码后校验 room、reservation 再完成签到；签到结果由后端确定。 | M1/D | POST/api/v1/reservations/{id}/checkin; D verify | 本人窗口/房间码/预约验证及幂等后端已实现，真实D/HTTP与并发/窗口验证通过；完整Web输入及E2E留Phase9/10 | PARTIAL | §十二; Phase 5 | 5 |
+| REQ-M1-014 | 第一版签到不使用 GPS、人脸识别、蓝牙、NFC。 | M1/Web | CheckinInput; D verify; 依赖/采集范围 | 仅房间码和本人预约输入；实现/依赖与真实HTTP验证无GPS、人脸、蓝牙或NFC采集 | DONE | §十二 | 5 |
 | REQ-M1-015 | M1 作为座位占用账本唯一所有者，提供 M2 教室占用、M3 维修占用及释放能力，并保留来源。 | M1 | seat_occupancy; ReservationMapper conflict query | M1拥有账本，三来源/null seat冲突读模型真实PG测试通过；M2/M3创建/释放HTTP留Phase8 | PARTIAL | §七、八、九; Phase 8 | 4 基础; 8 集成 |
 | REQ-M1-016 | M2 创建/释放教室占用、M3 创建/释放维修占用均由 M1 在 room_gate 同房间锁事务内执行。 | M1/M2/M3 | room-blocks API | 计划，未执行：与 M1 预约并发的互斥验证 | TODO | §八 | 8 |
 | REQ-M1-017 | 维修占用支持 endAt=null 的开放结束时间；释放时更新账本释放信息，区间冲突边界待确认。 | M1/M3 | seat_occupancy nullable end; conflict query | 真实PG中M3开放结束形状持续阻止冲突区间，半开边界已测；真实维修创建/释放HTTP留Phase8 | PARTIAL | §九 | 8 |
@@ -254,7 +254,7 @@ OQ-01..15 全部保留。Phase 4 对 OQ-01/02/07/10/12/13/14 给出具体时间/
 | ID | Requirement | Module | API/Page | Test | Status | Source | Phase |
 |---|---|---|---|---|---|---|---|
 | REQ-ETH-001 | 持续维护 docs/ethics/ETHICS_LOG.md，记录实际问题与决策，不在最后补写空泛文章。 | 治理 | docs/ethics/ETHICS_LOG.md | 随Phase1–4记录身份/范围/最小数据、预约时间/取消/历史保留和快照边界；持续事项不以文档存在完成 | PARTIAL | §三十八 | 3 起持续 |
-| REQ-ETH-002 | 记录并决定违约记录保存周期，实施前明确保留、删除和可见范围。 | M1/D | 违约数据生命周期 | 计划，未执行：保留策略与实现对照 | TODO | §三十八 | 3–5 起持续 |
+| REQ-ETH-002 | 记录并决定违约记录保存周期，实施前明确保留、删除和可见范围。 | M1/D | ETHICS_LOG; GET/api/v1/violations | 最小违约字段仅本人可见；保留/删除/申诉周期仍待审，不假定永久保存，不加处罚 | PARTIAL | §三十八 | 3–5 起持续 |
 | REQ-ETH-003 | 记录管理员权限边界及个人信息最小化问题。 | D/全服务 | D 角色/显式 room scope; ETHICS_LOG | 记录系统管理员/房间管理员边界、五用户 seed 和字段最小化；方案待审，部门审批与生产个人信息仍留后续 | PARTIAL | §三十八 | 3 起持续 |
 | REQ-ETH-004 | 记录日志数据相关风险及处置，遵守敏感字段禁止记录要求。 | 全服务 | D 请求/异常/审计日志; ETHICS_LOG | 已记录日志最小化与审计保留风险；本轮实际 D 日志抽查无私有凭据/生成码，未来模块/部署继续处置和审阅 | PARTIAL | §三十八 | 1 起持续 |
 | REQ-ETH-005 | 记录 Agent 越权风险与基于 API 权限的约束措施。 | Optional | Agent / ETHICS_LOG | 计划，未执行：越权测试与风险处置 | TODO | §三十八 | 15 可选 |
@@ -269,7 +269,7 @@ OQ-01..15 全部保留。Phase 4 对 OQ-01/02/07/10/12/13/14 给出具体时间/
 | REQ-PH-002 | 建四 schema、独立账号、Flyway、最小 seed；开发环境 docker compose down -v 后 up -d，全新数据库自动 migration。 | 数据库 | 四服务数据库工程; deploy/postgres; LocalDemoSeed | 已执行：23 项 JUnit/Testcontainers；Compose down -v/up -d 空卷自动迁移、七容器健康、数据库隔离检查；保留卷重启计数/密码哈希不变，见 Phase 2 验证记录 | DONE | Phase 2 | 2 |
 | REQ-PH-003 | 实现 login、RBAC、user、role、permission、building、room、seat、settings、checkin code、audit；管理员能维护空间，学生无管理权限，后端 RBAC 生效。 | D | D 32 操作; V2/V3; OpenAPI/运行脚本 | 已执行：后端 49 项/前端 6 项及 lint/类型检查/build 通过；保留原卷 V1→V3、七容器 healthy、真实五用户登录/管理员空间与参数/范围内房管/日码/审计/学生拒绝/内部隐藏及恢复检查全部通过 | DONE | Phase 3 | 3 |
 | REQ-PH-004 | 实现房间/座位/可用性查询、创建、取消、历史、再预约、room_gate、seat_occupancy；验收不能重复预约、默认 4 小时、插座过滤、历史再预约。 | M1 | M1 V2/8 API; OpenAPI; 运行脚本 | 75项后端/前端6项与构建通过；保留原卷M1 V1→V2、七容器、网关公共层回归与预约/冲突/插座/取消/历史再预约、隔离/账本和数据保留检查通过；最终干净版本重建另记 | DONE | Phase 4 | 4 |
-| REQ-PH-005 | 实现签到、T−15/T+10 提醒、T+15 NO_SHOW、违约和占用释放，使用可注入 Clock。 | M1/D | M1 签到违约 | 计划，未执行：真实签到及全部时间节点验证 | TODO | Phase 5 | 5 |
+| REQ-PH-005 | 实现签到、T−15/T+10 提醒、T+15 NO_SHOW、违约和占用释放，使用可注入 Clock。 | M1/D | M1生命周期; D站内收件箱; V3/V4 | 完整clean reactor102项、前端6项、保留原卷D4/M1 V3升级及网关检查通过；最终干净SHA另核对，结束等待Phase6 | DONE | Phase 5 | 5 |
 | REQ-PH-006 | 实现 submit、approval、approve、reject、cancel、timeout；单元测试可 mock M1，生产必须真实 HTTP client。 | M2 | M2 | 计划，未执行：状态机及 HTTP client 验收 | TODO | Phase 6 | 6 |
 | REQ-PH-007 | 实现 report、assign、start、finish、accept、cancel、review、escalate，并满足 §十四 rejectAcceptance 要求。 | M3 | M3 | 计划，未执行：工单完整流程与超时验收 | TODO | Phase 7 | 7 |
 | REQ-PH-008 | 连接 M2→M1、M3→M1，删除生产 mock；以真实审批占用及维修下架/验收恢复 E2E 验收。 | M2/M3/M1 | 跨模块集成 | 计划，未执行：两条真实跨模块流程 | TODO | Phase 8 | 8 |
@@ -284,8 +284,8 @@ OQ-01..15 全部保留。Phase 4 对 OQ-01/02/07/10/12/13/14 给出具体时间/
 ## 基线统计与更新规则
 
 - 需求总数：186。
-- 当前状态：DONE 28；TODO 130；PARTIAL 28；BLOCKED 0。
+- 当前状态：DONE 48；TODO 104；PARTIAL 34；BLOCKED 0。
 - 分类计数：REQ-P0: 8, REQ-GOV: 12, REQ-ARCH: 12, REQ-DATA: 12, REQ-D: 8, REQ-M1: 17, REQ-M2: 10, REQ-M3: 12, REQ-API: 8, REQ-SEC: 12, REQ-ENG: 9, REQ-UI: 9, REQ-TEST: 12, REQ-OPS: 16, REQ-AGENT: 7, REQ-ETH: 7, REQ-PH: 15。
 - API/Page 和 Test 的计划内容须在对应阶段替换/补充为真实契约、代码/测试路径和执行证据；保留源要求与稳定 ID。
 - 标记 DONE 前，检查源 §三十九 DoD 和本阶段适用范围，更新实际验收记录；不得把计划测试名称、文档审阅或工具退出码冒充业务测试通过。
-- Phase 0–2 保留为历史基线；当前仅 Phase 3 获授权，Phase 4–15 继续等待确认。未建的业务表、完整 Web、CI/CD 继续保留原需求和 TODO，不以 D 实现替代后续验收。
+- Phase 0–4保留为历史基线；当前仅Phase 5获授权，完成后停止等待Phase 6。未完成的正常COMPLETED、完整Web、M2/M3和CI/CD需求继续保留，不以模型/文档代替验收。

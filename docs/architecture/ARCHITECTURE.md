@@ -1,6 +1,6 @@
 # 校园资源服务平台架构基线
 
-状态：Phase 0 建立目标架构，当前补充 Phase 4 M1 基础预约，schema/公共契约仍待人工 Review。前序隔离数据库与 D 公共层保留；本轮 M1 V2、8 个预约操作及 M1→D 真实身份/主数据/参数 HTTP 已实现，D 增至 33 操作。当前 75 个后端测试通过；首次保留原卷升级、七容器健康、真实网关预约与公共层回归、数据库/密码保留验证通过，最终干净 GitHub 版本重建另记于 [Phase 4 验证](../review/phase-4-validation.md)，不预填。完成后停止等待 Phase 5，未将后续目标架构标为完成。
+状态：当前 Phase 5 签到、提醒与违约实现与首次验证通过，D V4/M1 V3 与 35/10 个操作形成具体草案；schema/公共契约仍待人工 review。Phase 0–4 历史交付保留，本轮测试、Compose 保留卷升级和最终干净版本结果以[Phase 5 验证](../review/phase-5-validation.md)为准，不预填。完成后停止等待 Phase 6。
 
 依据：[原始执行要求](../requirements/CODEX_EXECUTION_PROMPT.md)第 1–40 节及 Phase 0–15。完整需求和状态以 [REQUIREMENTS.md](../requirements/REQUIREMENTS.md) 与 [TRACEABILITY.md](../requirements/TRACEABILITY.md) 为准；数据归属见 [DATA_OWNERSHIP.md](DATA_OWNERSHIP.md)，边界决策见 [ADR-001](../adr/ADR-001-service-boundary.md)。
 
@@ -8,7 +8,7 @@
 
 采用 Monorepo、前后端分离、4 个后端服务、REST API 和 PostgreSQL。核心业务结果由确定性的业务规则、权限检查、状态机和数据库约束产生。优先保证真实运行、可测试、可追踪与简单维护。
 
-Phase 0 为文档基线，Phase 1 已交付四服务、Vue 状态页和容器，Phase 2 建立四 schema/八账号/V1/最小 seed。Phase 3 交付 D 登录/JWT/RBAC、用户/角色/权限、空间主数据、参数、每日房间码和审计；D 当前提供五个私网主数据/参数/验码操作。Phase 4 交付 M1 查询/创建/取消/历史/再预约及房间锁账本；M1 使用真实 D HTTP 验证当前身份、空间与参数。实际签到、通知投递、审批、工单、M2/M3 占用 HTTP、完整 Web 和 CI/CD 仍按后续阶段实施。
+Phase 0 为文档基线，Phase 1/2 建立工程和隔离数据库，Phase 3 交付 D 身份/资源/参数/每日码/审计，Phase 4 交付 M1 基础预约与来源账本。Phase 5 在同一边界内增加 M1 签到与持久提醒/NO_SHOW/违约、D 真实站内收件箱，保留独立账号和 HTTP 调用。M2/M3 业务及占用 HTTP、完整 Web、CI/CD 仍按后续阶段实施。
 
 禁止为课程项目引入 Kafka、Nacos、Consul、Service Mesh、Event Sourcing、CQRS 等非必要基础设施。第一版不使用 Redis，也不使用 Redis 锁、分布式事务或 BPMN 引擎。不得用生产 mock、假接口、假数据或默认成功掩盖缺失能力。
 
@@ -38,7 +38,7 @@ flowchart LR
 
 M1 的房间、座位查询可以结合 D 主数据与自身占用数据，但不能直接读取 `platform` 表。M2/M3 对教室不可用的影响只能经由 M1 占用 API；D 的空间主数据管理不能直接修改 M1 账本。未规定 M2 与 M3 直接相互调用。
 
-D 的操作审计和通知接口是公共能力；各业务模块的业务事件仍归相应模块。审计传递和通知失败如何处理、是否要求调用成功后才完成某个业务动作，均待契约 Review，不引入消息队列作为默认实现。
+D 的操作审计和通知是公共能力，各业务事件仍归相应模块。Phase 5 将提醒持久保存至 M1 outbox，再通过真实 HTTP 请求 D 幂等入箱，D 接收与 NOTIFICATION_ACCEPTED 审计同事务；M1 保存通知 ID/接收时刻。ACCEPTED 只证明 D 已持久接收，不声称邮件送达或用户已读。当前不增加通用远程审计写接口，不引入消息队列。
 
 ## 3. 固定技术栈
 
@@ -53,17 +53,17 @@ D 的操作审计和通知接口是公共能力；各业务模块的业务事件
 | 华为云目标 | SWR、ECS、RDS PostgreSQL |
 | 后续可选 | ELB、CCE、DCS Redis；第一版不使用 Redis，CCE 仅在 ECS + Compose 稳定后考虑 |
 
-本表是完整目标选型；实际依赖版本以根 POM、各模块构建文件和 `pnpm-lock.yaml` 为准。前后端构建配置已在 Phase 1 建立，MyBatis、PostgreSQL 驱动、Flyway 与 Testcontainers 在 Phase 2 接入；当前静态 OpenAPI 与 D 33/M1 8 个实际操作同步，并通过正式规范校验；其他业务契约、完整 Web E2E、CI/CD 和云部署留后续阶段。
+本表是完整目标选型；实际依赖版本以根 POM、各模块构建文件和 `pnpm-lock.yaml` 为准。前后端构建配置已在 Phase 1 建立，MyBatis、PostgreSQL 驱动、Flyway 与 Testcontainers 在 Phase 2 接入；当前 D 35/M1 10 个操作的 OpenAPI 随实际代码更新，正式校验结果以阶段记录为准；其他业务契约、完整 Web E2E、CI/CD 和云部署留后续阶段。
 
 ## 4. 数据所有权与并发边界
 
-一个 PostgreSQL 实例容纳 `platform`、`reservation`、`classroom`、`maintenance` 四个 schema。Phase 2 为每服务分别建立 `<schema>_app` 与 `<schema>_migrator`：前者无 DDL 或 Flyway 历史表访问权限，后者只拥有本 schema，均不得访问其他服务 schema。D 在原 V1 八表基础上追加 V2/V3，当前共 12 张基础业务表，并撤销 app 对审计的 UPDATE/DELETE；M1 追加 V2，建立房间锁、预约、完整 11 字段占用账本和实际预约事件四表；M2/M3 仍只有 V1 迁移/权限基线。具体当前表与后续模型见 [DATA_OWNERSHIP.md](DATA_OWNERSHIP.md)。禁止跨 schema SQL、跨服务读写表、跨服务外键和借共享数据库绕过 HTTP。业务外键引用其他服务实体时，仅保存逻辑 ID，由所属服务 API 提供校验与数据。
+一个 PostgreSQL 实例容纳四 schema，各有独立 app/migrator。D V1–V3 的12张业务表保留，本轮 V4 增加 notification；M1 V2 四表保留，本轮 V3 增加 checkin、violation、reminder，并允许系统 NO_SHOW 事件使用空 actor ID；M2/M3 仍 V1。应用无 DDL/迁移历史权限，D 审计不能更新/删除，具体约束见[所有权](DATA_OWNERSHIP.md)。禁止跨 schema SQL/外键及借共享账号绕过 HTTP，跨服务实体只保留逻辑 ID。
 
 D 拥有空间主数据；M1 拥有 `room_gate`、`seat_reservation`、`seat_occupancy`、`checkin`、`violation`、`reservation_event`。房间和座位“存在什么”与某时段“是否可用”是不同责任：不可用来源必须由 M1 账本表示，不能全部压缩为 `seat.status`。
 
 所有改变房间座位状态的操作使用 M1 自有的 `room_gate(room_id PRIMARY KEY)`，在一个数据库事务中锁定对应房间行，检查占用并创建或释放占用后提交。覆盖 M1 创建/取消预约、M2 创建/释放教室占用和 M3 创建/释放维修占用。锁粒度为房间。D 不持有此锁，也不跨服务参与该本地事务。
 
-Phase 4 在真实 D 校验后进入本地事务，INSERT ON CONFLICT 懒创建 room_gate，再 SELECT FOR UPDATE，锁后复核 Clock；首次同房间/同座位并发也不能绕过互斥。D HTTP 不占用该锁，只提供快照，不承诺与 M1 提交跨服务原子。D 资源停用/移动/删除与已有预约的协调和历史保留仍待明确。签到/违约模型留 Phase 5，M2/M3 写接口留对应阶段。
+Phase 4 在真实 D 校验后进入本地事务，INSERT ON CONFLICT 懒创建 room_gate，再 SELECT FOR UPDATE，锁后复核 Clock；首次同房间/同座位并发也不能绕过互斥。D HTTP 不占用该锁，只提供快照，不承诺与 M1 提交跨服务原子。D 资源停用/移动/删除与已有预约的协调和历史保留仍待明确。Phase 5 签到/NO_SHOW 继续使用同房间锁，M2/M3 写接口留对应阶段。
 
 ## 5. 占用契约与跨服务一致性
 
@@ -105,11 +105,13 @@ M3：ASSIGNED -> BLOCKING_ROOM -> 调用 M1 -> IN_PROGRESS
 
 M1 本轮按带 offset 输入转 Instant，在显式业务时区校验整点/正整数小时；区间为 `[start,end)`，相邻允许。新建/再预约开始不得早于 Clock，读取 D 本次最大时长快照（初始 4）；不追溯改写旧预约、不私加未来天数或一人多座限制。创建前检查所有 ACTIVE 来源，同座位或 seat_id=null 整房间均冲突，end_at=null 持续生效，返回 409。目录包含启用的 STUDY_ROOM/CLASSROOM，支持真实插座筛选；本人 CREATED 只在开始前可取消，重复取消返回原结果；历史按取消或区间结束查询，再预约新建 ID，重新检查全部条件。以上为具体待审方案。
 
-提醒时间为预约开始前 15 分钟、开始后 10 分钟；开始后 15 分钟未签到触发 NO_SHOW，并取消预约、释放占用、新增违约及审计/事件。源同时列出 `NO_SHOW` 状态和“取消预约”动作，最终状态表达及相应转移待确认，不能自行用 `CANCELLED` 吞掉违约语义。时间逻辑使用可注入 `Clock`。
+Phase 5 草案用 `[T−15min,T+15min)` 作为本人 CREATED 签到窗口；真实 D 校验预约房间当日码，M1 取得 room_gate→预约锁后复核 Clock/状态，写 CHECKED_IN、唯一 checkin 与事件。重复签到返回已有结果，不保存明文码。`now >= T+15min` 时仍 CREATED 的预约最终写 NO_SHOW，保留 cancelled_at=null，将原文“取消预约”解释为结束有效性；在同一事务精确释放 M1 来源、写唯一 violation 和系统 NO_SHOW 事件，任何异常回滚。不新增补签到、封号或积分，正常 COMPLETED 触发仍未定义。
 
-D 在 Phase 3 的具体方案为每日每房间一个 8 位随机字符签到码，Clock/显式 ZoneId 决定今日、room/date 主键保证唯一、同日 ensure 不轮换；二维码载荷尚未实现。M1 后续须校验房间与预约并记录实际签到结果。首版不做 GPS、人脸识别、蓝牙和 NFC。
+D 在 Phase 3 的具体方案为每日每房间一个 8 位随机字符签到码，Clock/显式 ZoneId 决定今日、room/date 主键保证唯一、同日 ensure 不轮换；二维码载荷尚未实现。Phase 5 的 M1 经真实 D 验码后校验本人预约、窗口与账本并记录签到。首版不做 GPS、人脸识别、蓝牙和 NFC。
 
-M2 第一版审批链为普通学生 → `ROOM_ADMIN` → `DEPARTMENT_ADMIN`。M3 使用 `due_at` 和定时扫描记录 escalation event 并在 UI 标记。审批超时时长、维修时限、签到窗口、自动完成/违约仍未由源指定，须在相应阶段形成具体可审阅方案。Phase 4 的时间/取消规则是本轮实现草案，不据测试通过推定人工已批准。
+M2 第一版审批链为普通学生 → `ROOM_ADMIN` → `DEPARTMENT_ADMIN`。M3 使用 `due_at` 和定时扫描记录 escalation event 并在 UI 标记。审批超时时长、维修时限和正常完成触发仍未定义。Phase 5 的签到/NO_SHOW 具体政策与 Phase 4 时间/取消草案均待人工 review，不据测试或阶段授权推定已批准。
+
+提醒的有效窗口为首轮 `[T−15,T+10)`、次轮 `[T+10,T+15)`。独立扫描和发送任务默认各每30秒、每批100，调度池2，使 D 网络等待不阻塞 NO_SHOW 扫描。发送使用持久 claim/30秒 lease，最多3次总尝试，网络/5xx按30/60秒退避，4xx/坏响应终止。停机恢复优先处理过期 NO_SHOW，跳过失去意义的提醒；取消/签到抑制待发项。HTTP 在房间锁/事务外发送，发送前重查状态与到期，已在途的远端入箱不能与签到原子撤回，不能虚构跨服务回滚。
 
 ## 7. API、安全与可观测性
 
@@ -135,7 +137,7 @@ flowchart TB
     APIs --> DB[单 PostgreSQL / 四 schema / 独立账号]
 ```
 
-此图保留本地拓扑。当前仅 Nginx 绑定 loopback，默认 `127.0.0.1:18080`，代理 Vue、四服务只读运行信息，`/api/v1/reservation/...` 与 `/api/v1/reservations`（含子路径）到 M1，其余 `/api/v1/` 到 D；后端实际验证身份、权限与个人范围。数据库与后端无宿主端口，`/internal` 不经公共网关暴露；M2/M3 尚未开放业务 API。具体配置见 `compose.yaml`、`deploy/nginx/nginx.conf` 及[本地手册](../runbooks/local-development.md)；后续服务间 HTTP 调用走内部网络。
+此图保留本地拓扑。当前仅 Nginx 绑定 loopback，默认 `127.0.0.1:18080`，代理 Vue、四服务只读运行信息，`/api/v1/reservation/...` 与 `/api/v1/reservations`（含子路径）及 `/api/v1/violations` 到 M1，其余 `/api/v1/` 到 D；后端实际验证身份、权限与个人范围。数据库与后端无宿主端口，`/internal` 不经公共网关暴露；M2/M3 尚未开放业务 API。具体配置见 `compose.yaml`、`deploy/nginx/nginx.conf` 及[本地手册](../runbooks/local-development.md)；后续服务间 HTTP 调用走内部网络。
 
 ```mermaid
 flowchart TB
@@ -163,8 +165,8 @@ PR 质量门包括后端 lint/test、前端 lint/unit test、集成测试、构�
 | 1（已交付） | 四个 Spring Boot 服务、Vue 应用、Dockerfile/Compose/Nginx、health/info |
 | 2（已交付） | 四 schema、各自应用/迁移账号、Flyway、最小 seed |
 | 3（已交付） | D 身份权限、资源、参数、签到码与审计 |
-| 4（本轮） | M1 基础预约、真实 D HTTP、房间锁与占用账本；完成后停止等待 Phase 5 |
-| 5 | M1 签到、提醒、违约与释放 |
+| 4（已交付） | M1 基础预约、真实 D HTTP、房间锁与占用账本 |
+| 5（本轮） | M1 签到、提醒、违约与释放；D 持久站内收件箱；完成后停止等待 Phase 6 |
 | 6 | M2 申请审批、撤销与超时，生产真实 HTTP client |
 | 7 | M3 工单、验收、评价与升级 |
 | 8 | M2→M1、M3→M1 的真实跨模块集成及相应 E2E |
@@ -187,8 +189,8 @@ PR 质量门包括后端 lint/test、前端 lint/unit test、集成测试、构�
 1. DELETE 路径与三元幂等键的一致性；重复释放、已释放后重用业务引用及请求内容冲突比较规则。
 2. “最多 3 次”的计数含义、重试间隔/调度/恢复、4xx 最终状态及释放失败的同步状态。
 3. D 主数据变更与 M1 锁行生命周期；资源停用/删除对已存在预约与占用的影响。
-4. Phase 4 的整点/业务时区、半开区间、当前参数、开始前取消和历史再预约具体方案待 review；签到窗口、NO_SHOW、自动完成、审批和维修超时仍未定。
-5. D 的 JWT、独立内部身份、SYSTEM_ADMIN 全局/ROOM_ADMIN 显式范围已有 Phase 3 待审方案；其他模块接入、部门范围、通知与跨服务审计失败处理仍未完成。
+4. Phase 4 的整点/业务时区、半开区间、当前参数、开始前取消和历史再预约具体方案待 review；Phase 5 对签到窗口、NO_SHOW 和站内提醒已有具体待审方案；正常自动完成、审批和维修超时仍未定。
+5. D 的 JWT、独立内部身份、SYSTEM_ADMIN 全局/ROOM_ADMIN 显式范围已有 Phase 3 待审方案；其他模块接入、部门范围、站内通知已形成持久去重/有界恢复草案，通用跨服务审计失败处理与其他渠道仍未完成。
 6. 违约、个人信息、审计及业务事件的保存周期；应在工程伦理记录中持续跟踪实际决定。
 
-上述问题作为持续未决事项保留。Phase 3 对 D 日码/身份/范围/响应、Phase 4 对 M1 基础时间/取消/锁行/占用给出具体待审方案，未替后续签到、M2/M3 释放重试和生命周期作决定；数据库与公共契约仍须人工 Review，不能以测试、执行授权或上传仓库推定架构已获批准。
+上述问题作为持续未决事项保留。Phase 3 对 D 日码/身份/范围/响应、Phase 4 对 M1 基础时间/取消/锁行/占用给出具体待审方案，Phase 5 对签到/违约/站内提醒形成具体待审方案，未替 M2/M3 释放重试和正常完成/保留生命周期作决定；数据库与公共契约仍须人工 Review，不能以测试、执行授权或上传仓库推定架构已获批准。

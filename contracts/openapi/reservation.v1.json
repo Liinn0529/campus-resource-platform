@@ -1,9 +1,9 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "Campus Resource Platform — M1 基础预约 API",
-    "version": "0.1.0-phase4",
-    "description": "Phase 4 可运行草稿的静态公共契约，依据实际 ReservationController/Service/TimeRules/PlatformClient。schema 和跨模块选择待人工 review；本文件不证明业务测试或 Compose 验收已通过。仅包含 8 个基础预约操作，不包含 Phase 5 签到/违约/提醒或后续 M2/M3 占用写接口。成功为 {data,requestId}，错误为 {code,message,requestId}；时间边界详见操作说明和 docs/api/reservation.md。"
+    "title": "Campus Resource Platform — M1 预约、签到与违约 API",
+    "version": "0.1.0-phase5",
+    "description": "Phase 5 可运行草稿的静态公共契约，依据实际 ReservationController、LifecycleController、服务和真实 D HTTP 客户端。包含10个基础预约、本人签到和本人违约操作；提醒由后台调度与真实 D 站内收件箱接收，未提供公网调度入口。schema/公共契约待人工review，本文件不证明运行验收或CI通过。COMPLETED自动转换、完整业务Web和M2/M3占用写接口仍未实现。成功{data,requestId}，错误{code,message,requestId}。"
   },
   "servers": [
     {
@@ -20,6 +20,10 @@
     {
       "name": "M1 基础预约",
       "description": "权限在真实 D 身份快照后由 M1 检查；预约数据始终限制为本人。"
+    },
+    {
+      "name": "M1 签到与违约",
+      "description": "本人签到与违约查询；后台NO_SHOW和提醒不开放公网执行接口。"
     }
   ],
   "paths": {
@@ -411,7 +415,7 @@
         ],
         "operationId": "cancelOwnReservation",
         "summary": "取消本人尚未开始的预约",
-        "description": "需要 reservation:create，无请求体。只允许本人 CREATED 且 Clock 当前时刻早于 startAt；在开始时刻或以后、或其他不可取消状态返回 409 RESERVATION_CANNOT_CANCEL。重复取消 CANCELLED 返回 200 原记录，即使已经过开始时间，也不重复释放占用或写事件。房间锁与记录锁内取消，仅释放来源 (M1,当前预约 ID,RESERVATION)，并同事务记录 CANCELLED 事件。不存在/非本人统一 404，SYSTEM_ADMIN 无跨用户权限。",
+        "description": "需要 reservation:create，无请求体。只允许本人 CREATED 且 Clock 当前时刻早于 startAt；在开始时刻或以后、或其他不可取消状态返回 409 RESERVATION_CANNOT_CANCEL。重复取消 CANCELLED 返回 200 原记录，即使已经过开始时间，也不重复释放占用或写事件。房间锁与记录锁内取消，仅释放来源 (M1,当前预约 ID,RESERVATION)，并同事务记录 CANCELLED 事件。不存在/非本人统一 404，SYSTEM_ADMIN 无跨用户权限。 Phase 5同事务抑制尚未发送或租约已过期的提醒；已发出的在途D HTTP不能跨服务原子撤回。",
         "x-required-permission": "reservation:create",
         "responses": {
           "200": {
@@ -469,7 +473,7 @@
         ],
         "operationId": "rebookOwnHistory",
         "summary": "从本人历史预约创建新预约",
-        "description": "需要 reservation:create。原预约必须属于本人，且为 CANCELLED 或 endAt<=Clock 当前时刻；否则 409 RESERVATION_NOT_HISTORY。以原房间和座位、新请求的时间重新执行当前 D 资源/参数与锁内冲突校验；产生新 ID、rebookOf=原 ID、新 M1 来源及 REBOOKED 事件，保留原记录。SYSTEM_ADMIN 无跨用户权限。",
+        "description": "需要 reservation:create。原预约必须属于本人，且为 CANCELLED/NO_SHOW/COMPLETED 终态之一或 endAt<=Clock 当前时刻；否则 409 RESERVATION_NOT_HISTORY。以原房间和座位、新请求的时间重新执行当前 D 资源/参数与锁内冲突校验；产生新 ID、rebookOf=原 ID、新 M1 来源及 REBOOKED 事件，保留原记录。SYSTEM_ADMIN 无跨用户权限。 NO_SHOW/CANCELLED/COMPLETED 是本人终态历史，原endAt尚未到来亦可再预约；新请求仍须满足未来时间与当前资源/冲突检查。",
         "x-required-permission": "reservation:create",
         "responses": {
           "201": {
@@ -538,6 +542,132 @@
           }
         }
       }
+    },
+    "/api/v1/reservations/{id}/checkin": {
+      "post": {
+        "tags": [
+          "M1 签到与违约"
+        ],
+        "operationId": "checkinOwnReservation",
+        "summary": "校验房间当日码并签到本人预约",
+        "description": "需要 reservation:create且仅本人。当前CREATED预约只允许 [T−15min,T+15min)；过早409 CHECKIN_NOT_OPEN，截止时刻及以后409 CHECKIN_CLOSED，其他状态409 CHECKIN_NOT_ALLOWED。未知/非本人统一404，SYSTEM_ADMIN没有跨用户覆盖。真实HTTP校验D当前业务日期的预约房间码；合法格式但不匹配422 CHECKIN_CODE_INVALID，D故障/超时/无效响应503。D调用在事务外；随后room_gate→预约行锁并重新检查状态、Clock与精确ACTIVE账本，同事务更新CHECKED_IN、唯一checkin及事件，抑制未发送提醒。已CHECKED_IN且有一致签到记录时，格式合法的重复请求即使已过窗口也200原Booking，不再次验码或重复事件。code仅写入正文，不存储、不回显、不入日志。",
+        "x-required-permission": "reservation:create",
+        "responses": {
+          "200": {
+            "description": "请求成功。",
+            "headers": {
+              "X-Request-ID": {
+                "description": "本次 M1 请求生成的 UUID，与响应体 requestId 相同。",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ReservationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckinInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/violations": {
+      "get": {
+        "tags": [
+          "M1 签到与违约"
+        ],
+        "operationId": "listOwnViolations",
+        "summary": "分页查询本人最小违约记录",
+        "description": "需要 reservation:view:self。仅按认证用户过滤，SYSTEM_ADMIN无跨用户覆盖；按occurredAt DESC,id DESC排序，默认limit50、1..100、offset≥0，data直接为数组。仅有id、reservationId、reason=NO_SHOW、occurredAt。不引入自动处罚、封禁或额外个人数据。",
+        "x-required-permission": "reservation:view:self",
+        "responses": {
+          "200": {
+            "description": "请求成功。",
+            "headers": {
+              "X-Request-ID": {
+                "description": "本次 M1 请求生成的 UUID，与响应体 requestId 相同。",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ViolationListEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit50"
+          },
+          {
+            "$ref": "#/components/parameters/Offset"
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -546,7 +676,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "D 签发的用户 JWT；M1 以真实 HTTP 转发至 D GET /api/v1/me，D 校验签名、有效期、authVersion 与启用状态，并返回当前权限。M1 不持有 D JWT 签名密钥，也不读取 D 表。另一个 M1 专属 opaque 服务凭据仅用于 D 内部目录/参数，不能作为此处用户凭证。"
+        "description": "D 签发的用户 JWT；M1 以真实 HTTP 转发至 D GET /api/v1/me，D 校验签名、有效期、authVersion 与启用状态，并返回当前权限。M1 不持有 D JWT 签名密钥，也不读取 D 表。另一个 M1 专属 opaque 服务凭据用于 D 内部目录/参数/验码/通知接收，不能作为此处用户凭证。"
       }
     },
     "parameters": {
@@ -892,7 +1022,7 @@
               "NO_SHOW",
               "COMPLETED"
             ],
-            "description": "保留数据库的五类约束；Phase 4 只产生 CREATED 和 CANCELLED，不自动签到、违约或完成。"
+            "description": "数据库保留五类状态；当前实际产生 CREATED、CANCELLED、CHECKED_IN 和 NO_SHOW；不会自动写 COMPLETED。"
           },
           "createdAt": {
             "type": "string",
@@ -902,7 +1032,7 @@
           "cancelledAt": {
             "type": "string",
             "format": "date-time",
-            "description": "UTC Instant，响应使用 ISO 8601 的 Z 时间。",
+            "description": "取消时的UTC Instant；NO_SHOW结束有效性但不伪装为CANCELLED，cancelledAt仍为null。",
             "nullable": true
           },
           "rebookOf": {
@@ -1067,6 +1197,75 @@
             "description": "M1 为本次请求生成的追踪 ID，与 X-Request-ID 响应头相同。"
           }
         }
+      },
+      "CheckinInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$",
+            "writeOnly": true,
+            "description": "敏感房间当日码；只在JSON正文提交，不持久化、不记录日志、不在响应中回显。"
+          }
+        }
+      },
+      "Violation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "reservationId",
+          "reason",
+          "occurredAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "reservationId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "NO_SHOW"
+            ]
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "仅返回认证用户本人的最小违约记录；不提供处罚、积分、封号或跨用户管理视图。保存期限、删除与申诉政策仍待人工review。"
+      },
+      "ViolationListEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Violation"
+            }
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "M1 为本次请求生成的追踪 ID，与 X-Request-ID 响应头相同。"
+          }
+        }
       }
     },
     "responses": {
@@ -1167,7 +1366,7 @@
         }
       },
       "Conflict": {
-        "description": "RESERVATION_TIME_CONFLICT、RESERVATION_CANNOT_CANCEL、RESERVATION_NOT_HISTORY 或 DATA_CONFLICT；详见各操作。",
+        "description": "RESERVATION_TIME_CONFLICT、RESERVATION_CANNOT_CANCEL、RESERVATION_NOT_HISTORY 或 DATA_CONFLICT；详见各操作。 签到另有CHECKIN_NOT_OPEN、CHECKIN_CLOSED和CHECKIN_NOT_ALLOWED。",
         "headers": {
           "X-Request-ID": {
             "description": "本次 M1 请求生成的 UUID，与响应体 requestId 相同。",
@@ -1191,7 +1390,7 @@
         }
       },
       "Unprocessable": {
-        "description": "RESERVATION_HOUR_BOUNDARY、RESERVATION_INVALID_INTERVAL、RESERVATION_START_IN_PAST、RESERVATION_DURATION_EXCEEDED 或 RESOURCE_UNAVAILABLE。",
+        "description": "RESERVATION_HOUR_BOUNDARY、RESERVATION_INVALID_INTERVAL、RESERVATION_START_IN_PAST、RESERVATION_DURATION_EXCEEDED 或 RESOURCE_UNAVAILABLE。 签到码格式合法但D验证不匹配为CHECKIN_CODE_INVALID。",
         "headers": {
           "X-Request-ID": {
             "description": "本次 M1 请求生成的 UUID，与响应体 requestId 相同。",

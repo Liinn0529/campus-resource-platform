@@ -16,4 +16,4 @@ docker run --rm \
     --env TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock \
     --workdir /workspace \
     maven:3.9.11-eclipse-temurin-21 \
-    mvn -B -ntp verify "-DgitCommit=$revision" "-DbuildTime=$build_time" "$@"
+    mvn -B -ntp clean verify "-DgitCommit=$revision" "-DbuildTime=$build_time" "$@"

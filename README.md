@@ -2,14 +2,14 @@
 
 校园自习座位预约（M1）、整教室预约审批（M2）、物业报修（M3）和公共层（D）的 Monorepo。
 
-**当前交付：Phase 4 基础预约，代码与首次本地运行验收通过，最终干净版本重建待核对。** 已实现房间/座位/可用性、创建/取消、本人历史与再预约、房间行锁和来源占用账本；保留 Phase 3 的身份权限与公共层。当前 75 个后端测试通过（完整 reactor 69 项后新增 6 项边界测试，M1 最终子集 28 项），0 失败/错误/跳过，见 [Phase 4 方案](docs/plans/phase-4.md)、[预约 API](docs/api/reservation.md)和[平台 API](docs/api/platform.md)。首次保留原卷升级、七容器健康、真实网关预约流程及数据库/密码保留检查通过，最终干净版本重建另记于[Phase 4 验证](docs/review/phase-4-validation.md)；Phase 2/3 的历史验收单独保留。实际签到、提醒、审批和报修尚未实现。
+**当前执行：Phase 5 签到、提醒与违约，代码与首次运行验收通过，最终干净版本重建待核对。** 本轮新增真实 D 房间码签到、T−15/T+10 站内提醒、T+15 NO_SHOW、违约和对应占用释放；保留 Phase 4 基础预约。D V4/M1 V3、35/10 个操作的具体方案与契约交草稿 PR 人工 review，见 [Phase 5 计划](docs/plans/phase-5.md)、[预约 API](docs/api/reservation.md)及[平台 API](docs/api/platform.md)。测试、保留原卷升级、最终 SHA 构建和实际运行结果按[本轮验证记录](docs/review/phase-5-validation.md)逐项记录，未执行结果不预填；Phase 0–4 报告保留为历史。完成后停止等待 Phase 6，完整业务 Web、审批和报修未进入。
 
 ## 启动与验证
 
-Phase 4 代码位于 `feature/phase-4-reservations`，基于 Phase 3 最终提交；已通过验证的可运行分项分别上传 GitHub，保留[堆叠草稿 PR #5](https://github.com/Liinn0529/campus-resource-platform/pull/5)人工审阅，未自动合并。前序 [Phase 3 PR #4](https://github.com/Liinn0529/campus-resource-platform/pull/4)保留。
+Phase 5 代码位于 `feature/phase-5-checkin`，基于 Phase 4 最终提交 edf454a857447697ded69502393f62fc1eb6db1c；已验证的可运行分项按用户要求分别上传 GitHub，首个功能分项[18b245e9](https://github.com/Liinn0529/campus-resource-platform/commit/18b245e94378c33224b61b01a14b25b1b2ffc9af)已上传，保持[堆叠草稿PR #6](https://github.com/Liinn0529/campus-resource-platform/pull/6)供人工审阅，不自动合并。前序 [Phase 4 PR #5](https://github.com/Liinn0529/campus-resource-platform/pull/5)与历史分支保留。
 
 ```sh
-git clone --branch feature/phase-4-reservations https://github.com/Liinn0529/campus-resource-platform.git
+git clone --branch feature/phase-5-checkin https://github.com/Liinn0529/campus-resource-platform.git
 cd campus-resource-platform
 ./scripts/dev-up.sh
 ```
@@ -18,12 +18,12 @@ cd campus-resource-platform
 
 ```sh
 ./scripts/test-backend.sh
-python3 scripts/check-database.py --phase4
+python3 scripts/check-database.py --phase5
 python3 scripts/smoke-phase-1.py --platform-api --expected-commit "$(git rev-parse HEAD)"
-python3 scripts/smoke-phase-4.py --expected-commit "$(git rev-parse HEAD)"
+python3 scripts/smoke-phase-5.py --expected-commit "$(git rev-parse HEAD)"
 ```
 
-后端当前 75 项测试通过；M1 集成测试启动真实 D JAR 子进程与 Testcontainers PostgreSQL，覆盖首次同座位并发、时间/参数、所有来源冲突、权限、释放与回滚。6 项客户端边界测试使用错误响应夹具，不能替代真实 D 集成。`check-database.py --phase4` 检查账号隔离、D V3/M1 V2、最小 seed 及预约账本/事件一致性；`smoke-phase-4.py` 先执行公共层回归，再通过实际网关完成创建/冲突/取消/再预约，最后取消本次创建记录并保留历史。脚本从私有 `.env` 读取凭据且不输出 token。上述运行命令的本轮结果见阶段记录，源码变化后应重新执行。登录示例见[后端手册](docs/runbooks/backend.md#登录与平台-api)。
+Phase 4 的 75 项后端测试与真实运行验收是历史基线。Phase 5 当前测试执行中；真实 D JAR/HTTP 与 PostgreSQL 验证签到、时间边界、房间锁、提醒去重/恢复和违约释放，不把错误响应夹具当作真实业务集成。`check-database.py --phase5` 检查 D V4/M1 V3、账号隔离、最小集合和生命周期账本；`smoke-phase-5.py` 记录实际网关与当前时刻适用流程，固定时点的完整边界以注入 Clock 的真实集成测试为准，不等待系统时间或提供生产调时端点。脚本从私有 `.env` 读取凭据且不输出 token。运行结果以[Phase 5 验证](docs/review/phase-5-validation.md)为准，源码变化后重新执行。登录示例见[后端手册](docs/runbooks/backend.md#登录与平台-api)。
 
 前端独立开发需要 Node.js 24、pnpm 11.25.0：
 
@@ -46,7 +46,7 @@ pnpm build
 4. [ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md)：服务边界、技术栈和调用关系。
 5. [DATA_OWNERSHIP.md](docs/architecture/DATA_OWNERSHIP.md)：schema、账号和数据所有权。
 6. [ADR-001](docs/adr/ADR-001-service-boundary.md)：服务划分决策，待人工审阅。
-7. [Phase 4 计划](docs/plans/phase-4.md)、[预约 API](docs/api/reservation.md)、[平台 API](docs/api/platform.md)、[运行端点契约](docs/api/runtime.md)，以及历史 [Phase 3](docs/plans/phase-3.md) / [Phase 2](docs/plans/phase-2.md) / [Phase 1](docs/plans/phase-1.md) / [Phase 0](docs/plans/phase-0.md) 记录。
+7. [Phase 5 计划](docs/plans/phase-5.md)与[本轮验收](docs/review/phase-5-validation.md)、历史 [Phase 4](docs/plans/phase-4.md)、[预约 API](docs/api/reservation.md)、[平台 API](docs/api/platform.md)、[运行端点契约](docs/api/runtime.md)，以及历史 [Phase 3](docs/plans/phase-3.md) / [Phase 2](docs/plans/phase-2.md) / [Phase 1](docs/plans/phase-1.md) / [Phase 0](docs/plans/phase-0.md) 记录。
 
 原始依据保存在 [CODEX_EXECUTION_PROMPT.md](docs/requirements/CODEX_EXECUTION_PROMPT.md)，不将文档中的后续阶段任务视为提前执行授权。
 
@@ -87,16 +87,16 @@ campus-resource-platform/
 
 ## 基线
 
-后端使用 Java 21、Spring Boot 3.5.16、Spring Security、MyBatis、PostgreSQL、Flyway、Maven、Bean Validation、JUnit 5、Testcontainers、JaCoCo；前端使用 Vue 3、TypeScript、Vite、Vue Router、Pinia、Element Plus、Axios、Vitest；本地容器使用 Docker、Compose、Nginx。四个后端提供真实 health/info；D 提供身份与公共层 API，M1 提供基础预约 API，M2/M3 仍保持工程与迁移基线。
+后端使用 Java 21、Spring Boot 3.5.16、Spring Security、MyBatis、PostgreSQL、Flyway、Maven、Bean Validation、JUnit 5、Testcontainers、JaCoCo；前端使用 Vue 3、TypeScript、Vite、Vue Router、Pinia、Element Plus、Axios、Vitest；本地容器使用 Docker、Compose、Nginx。四个后端提供真实 health/info；D 提供身份与公共层 API，M1 提供基础预约及签到/违约 API，D 持久站内通知与 M1 生命周期调度正在实际验证；M2/M3 仍保持工程与迁移基线。
 
-四服务共用一个 PostgreSQL 实例，各自使用 `<schema>_app` 运行应用，以 `<schema>_migrator` 执行本服务的 Flyway 迁移。应用账号无 DDL 和迁移历史表权限，不能修改或删除审计记录；迁移账号不能访问其他服务 schema。公共层迁移至 V3、预约服务至 V2，M2/M3 仍为 V1；已发布迁移不可改写。跨服务只通过 HTTP。
+四服务共用一个 PostgreSQL 实例，各自使用 `<schema>_app` 运行应用，以 `<schema>_migrator` 执行本服务的 Flyway 迁移。应用账号无 DDL 和迁移历史表权限，不能修改或删除审计记录；迁移账号不能访问其他服务 schema。公共层本轮追加 V4、预约服务追加 V3，M2/M3 仍为 V1；已发布迁移不可改写。跨服务只通过 HTTP。
 
 七种角色、14 项权限及初始 35 条角色权限映射属于 V3 的应用参考目录，所有环境均加载；其中包含后续模块所需权限名称，不代表相应业务已经实现。`local` profile 另幂等写入原有 5 个演示用户、2 栋楼、4 间房间和每间 10 个座位，不扩充 seed，也不默认授予房间管理范围。演示密码由私有 `.env` 生成并保存为 BCrypt；重启不会重设已有密码。非本地 profile 不加载演示用户和空间，不要求演示密码，但必须提供数据源、迁移、JWT、内部调用方秘密及业务时区配置。
 
-用户管理以停用替代删除；空间支持新增、修改和启用状态，本阶段不提供硬删除。全局管理要求系统管理员及对应权限；房间管理员只管理显式授权的房间。参数与签到码能力不创建预约或实际签到记录。M1 经真实 D HTTP 验证身份与启用空间、读取当前最大时长，在本地房间锁事务内维护预约、占用及事件。取消仅本人且开始前，历史再预约产生新 ID；业务时间、生命周期和跨模块释放方案仍待草稿 PR 人工 review。GitHub Actions、云部署和 M2/M3 幂等业务 API 仍由后续阶段交付；首版不用 Redis。
+用户管理以停用替代删除；空间支持新增、修改和启用状态，本阶段不提供硬删除。M1 在本人预约的 `[T−15min,T+15min)` 窗口经真实 D 验码，在房间锁后重新校验时间，唯一签到和事件同事务写入；T+15 仍 CREATED 时写 NO_SHOW、唯一违约/系统事件并精确释放占用。D 站内通知按 M1 来源键去重，M1 持久提醒保存接收凭据；ACCEPTED 只表示 D 已入箱，不表示邮件送达或用户已读。默认独立扫描/发送任务各每30秒，调度池2，最多3次总尝试、网络/5xx退避30/60秒，4xx/坏契约终止；未过期提醒恢复可重试，过期跳过。签到/取消抑制待发提醒，已发出的跨服务请求不能原子撤回。违约仅本人查询，不引入封号/积分；保留期限和正常 COMPLETED 触发仍待审。完整 Web、M2/M3 和 CI/CD 留后续阶段，首版不用 Redis。
 
 ## 贡献与后续工作
 
-贡献流程见 [CONTRIBUTING.md](CONTRIBUTING.md)。每个已验证、可运行的分项单独提交并同步 GitHub，阶段结束保留草稿 PR 等待人工审阅。Phase 4 完成后停止，等待明确确认再进入 Phase 5；完整后续范围保留在需求基线。
+贡献流程见 [CONTRIBUTING.md](CONTRIBUTING.md)。每个已验证、可运行的分项单独提交并同步 GitHub，阶段结束保留草稿 PR 等待人工审阅。Phase 5 完成后停止，等待明确确认再进入 Phase 6；完整后续范围保留在需求基线。
 
 尚未选择开源许可证；上传仓库不自动授予额外使用许可。

@@ -2,11 +2,11 @@
 
 - 状态：**Proposed / 待人工 Review**
 - 日期：2026-10-20
-- 阶段：Phase 0 起草；Phase 2/3/4 补充实施范围
+- 阶段：Phase 0 起草；Phase 2/3/4/5 补充实施范围
 - 决策来源：[CODEX_EXECUTION_PROMPT.md](../requirements/CODEX_EXECUTION_PROMPT.md)第 4–10、16–18、24、29–37 节
 - 关联：[ARCHITECTURE.md](../architecture/ARCHITECTURE.md)、[DATA_OWNERSHIP.md](../architecture/DATA_OWNERSHIP.md)、[REQUIREMENTS.md](../requirements/REQUIREMENTS.md)、[TRACEABILITY.md](../requirements/TRACEABILITY.md)
 
-本 ADR 记录用户源文件已指定的架构约束及其影响。Proposed 表示尚待人工 Review，不表示可以自由替换源要求，也不表示人类已批准该文档或任何数据库/公共契约变更。Phase 0 起草时尚无服务或数据库；Phase 1/2 已交付骨架和隔离数据库。Phase 3 在 D 追加 V2/V3、32 个公开/内部操作和身份/角色/权限/空间/参数/日码/审计，保留七角色、五个 local seed 用户。后端 49 项、前端 6 项及保留原卷升级/七容器/实际 D API 验收通过。具体数据边界见 [DATA_OWNERSHIP.md](../architecture/DATA_OWNERSHIP.md)，实际证据见 [Phase 3 记录](../plans/phase-3.md)；Phase 4 进一步追加 M1 V2 四表/8 个公开操作与 M1→D 真实身份/目录/参数 HTTP（D 增至 33 操作），当前 75 个后端测试通过；首次 Compose 保留原卷升级/七容器/真实网关流程及数据保留验收通过，最终干净版本重建另见 [Phase 4 验证](../review/phase-4-validation.md)，不预填。实际签到、M2/M3 业务与占用 HTTP、通知投递、完整 Web 和生产部署仍属后续阶段。
+本 ADR 记录源文档指定的边界，Proposed 表示尚待人工 review，阶段执行或上传代码不自动批准架构。Phase 0–4 已交付并保留历史证据；本轮 Phase 5 追加 D V4 持久站内收件箱、M1 V3 签到/提醒/违约，35/10 个操作及具体时间、恢复和可见范围草案正在真实验证。当前结果见[Phase 5 验证](../review/phase-5-validation.md)，不预填测试或 Compose 成功。M2/M3、完整 Web、CI/CD 和部署留后续。
 
 ## 背景
 
@@ -24,6 +24,9 @@
 6. **跨服务采用显式同步状态与有界重试。** M2 经 `APPROVED_PENDING_SYNC` 才到 `APPROVED`；M3 经 `BLOCKING_ROOM` 才到 `IN_PROGRESS`。仅网络错误和 5xx 可重试，4xx 不重试；次数上限遵守源要求“最多 3 次”，计数含义待确认，耗尽进入 `SYNC_FAILED`。不用分布式事务掩盖部分成功。
 7. **占用创建有幂等身份。** 唯一键为 `(source_module, source_ref_id, source_type)`，一致请求返回已有结果，冲突内容返回 409。源指定 DELETE 路径缺少 `sourceType`，须人工 Review 解决后才固化释放实现，不在本 ADR 暗自修改契约。
 8. **业务判定留在确定性后端。** 权限由后端校验，认证采用密码/BCrypt/JWT；第一版不接学校统一身份认证。后续可选 Agent 只能调用公开业务 API，不直连数据库或决定审批、权限、预约、座位与工单状态。
+
+9. **提醒采用各自持久事实。** M1 拥有 reminder/outbox 和投递尝试，D 拥有用户站内 notification；稳定 M1 来源键实现幂等接收。D 入箱与接收审计同事务，ACCEPTED 仅表示持久接收，不能冒充邮件/已读。发送不持有 room_gate，独立30秒扫描/发送、调度池2；claim/lease、多次恢复和3次总尝试形成明确中间状态，网络/5xx退避30/60秒，4xx/坏契约终止。已在途请求与签到不能跨服务原子撤回。
+10. **签到与违约采用本地确定性转换。** 本人 `[T−15,T+15)` 经真实 D 验码，锁后复核 Clock；签到、唯一结果和事件同事务。T+15 仍 CREATED 写 NO_SHOW、唯一违约/系统事件并释放精确占用；正常 COMPLETED 未定，不私加处罚。违约本人可见，保存期限待审。
 
 ## 已排除的选择
 
@@ -54,9 +57,9 @@
 | 释放契约 | DELETE 两段标识如何唯一对应三元键；重复释放、内容冲突、引用重用与释放失败状态 |
 | 重试语义 | “最多 3 次”包含首次调用与否、调度间隔、持久化恢复、4xx 的最终处理及人工恢复入口 |
 | 资源生命周期 | D 资源创建/停用/删除与 M1 `room_gate`、已存在预约和占用之间的协调 |
-| 时间与业务政策 | Phase 4 的显式时区/整点、半开区间、当前参数、开始前取消/历史再预约已有待审方案；签到窗口、NO_SHOW/完成、审批/维修超时仍未定 |
-| 安全和数据最小化 | Phase 3 的 D JWT/独立内部凭据/房间范围已有具体待审方案；其他模块接入、部门范围、通知/跨服务审计失败和保留/删除周期仍待明确 |
+| 时间与业务政策 | Phase 4 的显式时区/整点、半开区间、当前参数、开始前取消/历史再预约已有待审方案；Phase 5 签到窗口、NO_SHOW、站内通知已有具体草案；正常完成、审批/维修超时仍未定 |
+| 安全和数据最小化 | Phase 3 的 D JWT/独立内部凭据/房间范围已有具体待审方案；其他模块接入、部门范围、站内通知已有持久接收/有界失败恢复草案；通用跨服务审计与保留/删除周期仍待明确 |
 
 Phase 0 的历史验收为文档存在、需求可追踪、边界有文字说明、未提前实现业务；Phase 1 已有运行端点和容器验收记录。Phase 2 使用真实 PostgreSQL/Testcontainers 验证迁移、schema 权限隔离、最小 seed 及幂等。Phase 3 的 49 项后端测试和实际 Compose/HTTP 验收覆盖 D 身份权限、范围、日码及审计；Phase 4 真实 D JAR/HTTP 与 PostgreSQL 已验证 M1 首次锁行竞争、同座位仅一成功、取消/再预约、权限和三来源/开放结束冲突；不替代 M2/M3 到 M1 的占用写接口/幂等业务 E2E 或生产部署验证。
 
-人工 Review 通过后方可记录 ADR 接受状态；本轮 Phase 4 完成后须停止，等待用户明确确认再进入 Phase 5。文档的 Proposed 状态不能被阶段执行授权、测试通过、Git 提交或上传仓库自动替代。
+人工 Review 通过后方可记录 ADR 接受状态；本轮 Phase 5 完成后须停止，等待用户明确确认再进入 Phase 6。文档的 Proposed 状态不能被阶段执行授权、测试通过、Git 提交或上传仓库自动替代。

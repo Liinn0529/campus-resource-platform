@@ -48,12 +48,13 @@ class RuntimeConfiguration {
         var source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/v1/reservation/**", cors);
         source.registerCorsConfiguration("/api/v1/reservations", cors);
+        source.registerCorsConfiguration("/api/v1/violations", cors);
         source.registerCorsConfiguration("/api/v1/reservations/**", cors);
         return http.csrf(AbstractHttpConfigurer::disable).cors(config -> config.configurationSource(source))
                 .addFilterBefore(new RemoteAuthenticationFilter(platform, json), AnonymousAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/info").permitAll()
-                        .requestMatchers("/api/v1/reservation/**", "/api/v1/reservations", "/api/v1/reservations/**")
+                        .requestMatchers("/api/v1/reservation/**", "/api/v1/reservations", "/api/v1/reservations/**", "/api/v1/violations")
                             .authenticated()
                         .anyRequest().denyAll())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

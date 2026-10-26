@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -16,15 +17,17 @@ class ReservationService {
     record Availability(long roomId, Instant startAt, Instant endAt, List<SeatAvailability> seats) { }
 
     private final ReservationMapper reservations;
+    private final LifecycleMapper lifecycle;
     private final PlatformClient platform;
     private final AccessPolicy access;
     private final TimeRules time;
     private final Clock clock;
     private final TransactionTemplate transactions;
 
-    ReservationService(ReservationMapper reservations, PlatformClient platform, AccessPolicy access,
+    ReservationService(ReservationMapper reservations, LifecycleMapper lifecycle, PlatformClient platform, AccessPolicy access,
             TimeRules time, Clock clock, PlatformTransactionManager transactionManager) {
         this.reservations = reservations;
+        this.lifecycle = lifecycle;
         this.platform = platform;
         this.access = access;
         this.time = time;
@@ -92,6 +95,7 @@ class ReservationService {
                 throw new IllegalStateException("Reservation and occupancy state are inconsistent");
             }
             reservations.event(id, userId, "CANCELLED", UUID.fromString(RequestIds.current()), now);
+            lifecycle.suppressPending(id, now, "RESERVATION_CANCELLED");
             return reservations.owned(id, userId);
         });
     }
@@ -100,7 +104,8 @@ class ReservationService {
         access.require("reservation:create");
         long userId = access.actor().id();
         ReservationMapper.Booking previous = owned(id, userId);
-        if (!previous.status().equals("CANCELLED") && previous.endAt().isAfter(clock.instant())) {
+        if (!Set.of("CANCELLED", "NO_SHOW", "COMPLETED").contains(previous.status())
+                && previous.endAt().isAfter(clock.instant())) {
             throw new ApiFailure(HttpStatus.CONFLICT, "RESERVATION_NOT_HISTORY", "仅可重新预约本人的历史记录");
         }
         return createFor(userId, previous.roomId(), previous.seatId(), startAt, endAt, previous.id());

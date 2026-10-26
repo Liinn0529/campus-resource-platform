@@ -37,8 +37,9 @@ def main():
     phase = parser.add_mutually_exclusive_group()
     phase.add_argument("--phase3", action="store_true", help="Check platform V3, reference permissions and append-only audit")
     phase.add_argument("--phase4", action="store_true", help="Also check reservation V2 and workflow ledger consistency")
+    phase.add_argument("--phase5", action="store_true", help="Check platform V4, reservation V3 and check-in/no-show/reminders")
     args = parser.parse_args()
-    platform_v3 = args.phase3 or args.phase4
+    platform_v3 = args.phase3 or args.phase4 or args.phase5
 
     expected_roles = sorted(schema + suffix for schema in SCHEMAS for suffix in ("_app", "_migrator"))
     rows = query("SELECT rolname || '|' || rolsuper || '|' || rolcreatedb || '|' || rolcreaterole || '|' "
@@ -50,8 +51,11 @@ def main():
 
     versions = {schema: (["1", "2", "3"] if platform_v3 and schema == "platform" else ["1"])
                 for schema in SCHEMAS}
-    if args.phase4:
+    if args.phase4 or args.phase5:
         versions["reservation"] = ["1", "2"]
+    if args.phase5:
+        versions["platform"] = ["1", "2", "3", "4"]
+        versions["reservation"] = ["1", "2", "3"]
     for schema in SCHEMAS:
         assert query("SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname='" + schema + "'") == schema + "_migrator"
         assert query("SELECT version || '|' || success FROM " + schema
@@ -95,8 +99,10 @@ def main():
     if platform_v3:
         evidence.pop("version")
         evidence["versions"] = versions
-    if args.phase4:
-        check_reservation_workflow()
+    if args.phase4 or args.phase5:
+        check_reservation_workflow(args.phase5)
+    if args.phase5:
+        check_lifecycle()
     if args.compare:
         assert json.loads(args.compare.read_text()) == evidence, "Data or existing passwords changed on restart"
         print("PASS: restart retained exact counts, migration versions and existing password hashes")
@@ -105,7 +111,7 @@ def main():
     print("PASS: minimum seed counts", json.dumps(counts, sort_keys=True))
 
 
-def check_reservation_workflow():
+def check_reservation_workflow(phase5=False):
     tables = query("SELECT tablename FROM pg_tables WHERE schemaname='reservation' AND tablename IN "
                    "('room_gate','seat_reservation','seat_occupancy','reservation_event') ORDER BY tablename",
                    "reservation").splitlines()
@@ -124,10 +130,12 @@ def check_reservation_workflow():
                  "(SELECT count(*) FROM reservation.seat_occupancy o WHERE o.source_module='M1' "
                  "AND o.source_type='RESERVATION' AND o.source_ref_id=r.id::text)<>1",
                  "reservation") == "0"
+    released = "('CANCELLED','NO_SHOW')" if phase5 else "('CANCELLED')"
+    active = "('CREATED','CHECKED_IN')" if phase5 else "('CREATED')"
     assert query("SELECT count(*) FROM reservation.seat_reservation r JOIN reservation.seat_occupancy o "
                  "ON o.source_module='M1' AND o.source_type='RESERVATION' AND o.source_ref_id=r.id::text "
-                 "WHERE (r.status='CANCELLED' AND (o.status<>'RELEASED' OR o.released_at IS NULL)) "
-                 "OR (r.status='CREATED' AND (o.status<>'ACTIVE' OR o.released_at IS NOT NULL))",
+                 "WHERE (r.status IN " + released + " AND (o.status<>'RELEASED' OR o.released_at IS NULL)) "
+                 "OR (r.status IN " + active + " AND (o.status<>'ACTIVE' OR o.released_at IS NOT NULL))",
                  "reservation") == "0"
     assert query("SELECT count(*) FROM reservation.seat_reservation r WHERE NOT EXISTS "
                  "(SELECT 1 FROM reservation.reservation_event e WHERE e.reservation_id=r.id "
@@ -148,6 +156,39 @@ def check_reservation_workflow():
     # Workflow history is intentionally retained and can grow after another real smoke run.
     # Keep it outside the stable seed/password/version snapshot used for restart comparison.
     print("PASS: reservation V2 gates, unique sources, ledger/state/event consistency", json.dumps(rows, sort_keys=True))
+
+
+def check_lifecycle():
+    assert query("SELECT count(*) FROM reservation.seat_reservation r WHERE "
+                 "(r.status='CHECKED_IN') <> EXISTS(SELECT 1 FROM reservation.checkin c WHERE c.reservation_id=r.id "
+                 "AND c.user_id=r.user_id)", "reservation") == "0"
+    assert query("SELECT count(*) FROM reservation.seat_reservation r WHERE "
+                 "(r.status='NO_SHOW') <> EXISTS(SELECT 1 FROM reservation.violation v WHERE v.reservation_id=r.id "
+                 "AND v.user_id=r.user_id AND v.reason='NO_SHOW')", "reservation") == "0"
+    for status in ("CHECKED_IN", "NO_SHOW"):
+        assert query("SELECT count(*) FROM reservation.seat_reservation r WHERE r.status='" + status + "' AND "
+                     "(SELECT count(*) FROM reservation.reservation_event e WHERE e.reservation_id=r.id "
+                     "AND e.action='" + status + "')<>1", "reservation") == "0"
+    assert query("SELECT count(*) FROM reservation.reservation_event WHERE "
+                 "(action='NO_SHOW' AND actor_user_id IS NOT NULL) "
+                 "OR (action<>'NO_SHOW' AND actor_user_id IS NULL)", "reservation") == "0"
+    assert query("SELECT count(*) FROM reservation.reminder m JOIN reservation.seat_reservation r "
+                 "ON r.id=m.reservation_id WHERE (m.kind='CHECKIN_FIRST' AND "
+                 "(m.due_at<>r.start_at-INTERVAL '15 minutes' OR m.expires_at<>r.start_at+INTERVAL '10 minutes')) "
+                 "OR (m.kind='CHECKIN_SECOND' AND (m.due_at<>r.start_at+INTERVAL '10 minutes' "
+                 "OR m.expires_at<>r.start_at+INTERVAL '15 minutes'))", "reservation") == "0"
+    # This verifier may inspect both schemas as the operator; production services never do so.
+    assert query("SELECT count(*) FROM reservation.reminder m JOIN reservation.seat_reservation r "
+                 "ON r.id=m.reservation_id LEFT JOIN platform.notification n ON n.id=m.notification_id "
+                 "WHERE m.status='ACCEPTED' AND (n.id IS NULL OR n.source_module<>'M1' "
+                 "OR n.source_ref_id<>'reservation-reminder:' || m.id::text OR n.user_id<>r.user_id "
+                 "OR n.reservation_id<>r.id OR n.room_id<>r.room_id OR n.start_at<>r.start_at "
+                 "OR n.kind<>m.kind OR n.due_at<>m.due_at OR n.expires_at<>m.expires_at)") == "0"
+    summary = {table: int(query("SELECT count(*) FROM reservation." + table, "reservation"))
+               for table in ("checkin", "violation", "reminder")}
+    summary["notifications"] = int(query("SELECT count(*) FROM platform.notification", "platform"))
+    print("PASS: check-in/no-show uniqueness, automated event actors, reminder windows and actual D receipts",
+          json.dumps(summary, sort_keys=True))
 
 
 if __name__ == "__main__":

@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Campus Resource Platform — implemented D APIs",
-    "version": "0.1.0-phase4-catalog",
-    "description": "Static contract for Phase 3 source only. Public user JWT and private opaque service credentials are different trust domains. API success is {data,requestId}; errors are {code,message,requestId}. Arrays have no invented total/page wrapper. Runtime actuator endpoints are documented separately in docs/api/runtime.md. Future reservation, classroom approval, maintenance and notification endpoints are not implemented."
+    "version": "0.1.0-phase5",
+    "description": "Static contract for the implemented D identity, spaces, settings, check-in codes, audit and Phase 5 durable owner inbox. Public JWT and private opaque service credentials are separate trust domains. Success is {data,requestId}; errors are {code,message,requestId}; arrays have no invented page wrapper. D exposes 35 operations. M1 owns attendance and reminder scheduling; inbox acceptance is not email delivery or proof of reading. Schema and public contracts remain draft for human review. Runtime actuator APIs are separate in docs/api/runtime.md."
   },
   "servers": [
     {
@@ -29,6 +29,10 @@
     },
     {
       "name": "Audit"
+    },
+    {
+      "name": "Notifications",
+      "description": "Durable owner inbox for actual M1 reminders; no email or read receipts."
     },
     {
       "name": "Internal"
@@ -2071,7 +2075,7 @@
         "tags": [
           "Internal"
         ],
-        "description": "Only reservation-service identity may call. Unknown/disabled room, absent current-date code or a well-formed mismatch returns 200 with valid:false. Malformed code/ID returns 400. Uses business date at request time and constant-time code comparison. It has no side effects and does not verify a reservation, user ownership or attendance; those remain M1 Phase 5 responsibilities.",
+        "description": "Only reservation-service identity may call. Unknown/disabled room, absent current-date code or a well-formed mismatch returns 200 with valid:false. Malformed code/ID returns 400. Uses business date at request time and constant-time code comparison. It has no side effects and does not verify a reservation, user ownership or attendance; M1 Phase 5 performs those attendance checks using this real HTTP result.",
         "security": [
           {
             "InternalCaller": []
@@ -2206,6 +2210,163 @@
           "maintenance-service"
         ]
       }
+    },
+    "/api/v1/notifications": {
+      "get": {
+        "operationId": "listOwnNotifications",
+        "summary": "Read the authenticated user’s durable inbox",
+        "tags": [
+          "Notifications"
+        ],
+        "description": "Requires reservation:view:self. Only rows for the current authenticated user; SYSTEM_ADMIN has no cross-user override. Ordered by id descending with limit 1–100 (default 50), offset≥0. Data is an array, including retained expired-window history. It proves D persistence, not reading, push, SMS or email delivery.",
+        "security": [
+          {
+            "UserBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit50"
+          },
+          {
+            "$ref": "#/components/parameters/Offset"
+          }
+        ],
+        "x-required-permission": "reservation:view:self",
+        "x-authorization-scope": "current authenticated user only"
+      }
+    },
+    "/internal/v1/notifications": {
+      "post": {
+        "operationId": "internalAcceptReservationNotification",
+        "summary": "Accept an idempotent M1 reminder into the durable owner inbox",
+        "tags": [
+          "Internal",
+          "Notifications"
+        ],
+        "description": "Only reservation-service opaque identity may call. New source (M1,sourceRefId) persists one item and one system audit in the same D transaction and returns 201. Exact duplicate payload, comparing timestamps as Instants, returns 200 with the original item and no duplicate audit, including after the original recipient is disabled. A source reused with different recipient/reservation/room/time/kind returns 409 NOTIFICATION_SOURCE_CONFLICT. New nonexistent/disabled recipient returns 422 NOTIFICATION_RECIPIENT_UNAVAILABLE; invalid due/expiry arithmetic returns 422 NOTIFICATION_INVALID_WINDOW. Malformed/unknown fields return 400. M1 is responsible for scheduling, current reservation eligibility and its dispatch window; D does not call M1 or read its tables. Acceptance means durable inbox storage, not recipient read or external-channel delivery.",
+        "security": [
+          {
+            "InternalCaller": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exact repeated source and payload; returns the original persisted item.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          },
+          "201": {
+            "description": "New item and acceptance audit durably persisted in one D transaction.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationWrite"
+              }
+            }
+          }
+        },
+        "servers": [
+          {
+            "url": "http://platform-service:8080",
+            "description": "Local Compose backend network only. Never publish this server or these paths through the public gateway."
+          }
+        ],
+        "x-internal-callers": [
+          "reservation-service"
+        ]
+      }
     }
   },
   "components": {
@@ -2220,7 +2381,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "opaque service secret",
-        "description": "Private backend-network credential. Three distinct secrets of at least 32 UTF-8 bytes identify reservation-service, classroom-service or maintenance-service. User JWTs are rejected. Only reservation-service can verify a check-in code."
+        "description": "Private backend-network opaque credential. Three distinct secrets of at least 32 UTF-8 bytes identify reservation-service, classroom-service or maintenance-service. User JWTs are rejected. Only reservation-service may verify a check-in code or submit a notification."
       }
     },
     "parameters": {
@@ -3476,6 +3637,172 @@
           "data",
           "requestId"
         ]
+      },
+      "NotificationWrite": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sourceRefId",
+          "userId",
+          "reservationId",
+          "roomId",
+          "startAt",
+          "kind",
+          "dueAt",
+          "expiresAt"
+        ],
+        "properties": {
+          "sourceRefId": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$",
+            "description": "Stable idempotency source; actual M1 sender uses reservation-reminder:<reminder ID>."
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "reservationId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "roomId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "startAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "CHECKIN_FIRST",
+              "CHECKIN_SECOND"
+            ]
+          },
+          "dueAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "Trusted M1 payload only, with explicit-offset timestamps. CHECKIN_FIRST requires dueAt=startAt−15min and expiresAt=startAt+10min; CHECKIN_SECOND requires +10min/+15min. D checks this arithmetic, recipient availability for new sources and source identity; M1 owns reservation eligibility and dispatch expiry."
+      },
+      "Notification": {
+        "type": "object",
+        "required": [
+          "id",
+          "userId",
+          "sourceModule",
+          "sourceRefId",
+          "reservationId",
+          "roomId",
+          "startAt",
+          "kind",
+          "dueAt",
+          "expiresAt",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "sourceModule": {
+            "type": "string",
+            "enum": [
+              "M1"
+            ]
+          },
+          "sourceRefId": {
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$",
+            "description": "Stable idempotency source; actual M1 sender uses reservation-reminder:<reminder ID>."
+          },
+          "reservationId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "roomId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "startAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "CHECKIN_FIRST",
+              "CHECKIN_SECOND"
+            ]
+          },
+          "dueAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "Persisted D inbox item. createdAt is the actual D acceptance time. No read/delivery boolean is invented; timestamps serialize as UTC Instants. Logical reservation/room IDs are supplied by authenticated M1, with no cross-schema SQL."
+      },
+      "NotificationResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Notification"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ]
+      },
+      "NotificationListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Notification"
+            }
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ]
       }
     },
     "responses": {
@@ -3575,7 +3902,7 @@
         }
       },
       "409": {
-        "description": "DATA_CONFLICT for database constraints, LAST_SYSTEM_ADMIN, SYSTEM_ADMIN_PERMISSIONS_FIXED, or IDENTITY_CHANGED as applicable.",
+        "description": "DATA_CONFLICT for database constraints, LAST_SYSTEM_ADMIN, SYSTEM_ADMIN_PERMISSIONS_FIXED, or IDENTITY_CHANGED as applicable. NOTIFICATION_SOURCE_CONFLICT when an accepted source is replayed with a different payload.",
         "headers": {
           "X-Request-ID": {
             "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
@@ -3594,7 +3921,7 @@
         }
       },
       "422": {
-        "description": "INVALID_REFERENCE_OR_VALUE: unknown role/permission/room reference, room scope target without ROOM_ADMIN, empty user patch, or blank display name.",
+        "description": "INVALID_REFERENCE_OR_VALUE: unknown role/permission/room reference, room scope target without ROOM_ADMIN, empty user patch, or blank display name. NOTIFICATION_RECIPIENT_UNAVAILABLE or NOTIFICATION_INVALID_WINDOW for notification acceptance.",
         "headers": {
           "X-Request-ID": {
             "description": "Server-generated request UUID, also returned in the JSON envelope/error. Client values are not trusted.",
