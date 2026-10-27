@@ -1,6 +1,6 @@
 # 数据所有权与一致性边界
 
-状态：Phase6申请、两级审批、拒绝、前置撤销、超时与持久同步已实现，130项后端及首轮真实运行验收通过。D4/M1 V3/M2 V2/M3 V1，D36/M1 10/M2 6操作；schema/公共契约仍待草稿PR人工review。真实M1封房/释放留Phase8，当前403明确记SYNC_FAILED；完整Web留Phase9。验证和最终干净版本证据见[Phase6验收](../review/phase-6-validation.md)，完成后等待Phase7。
+状态：当前Phase7工单、验收/返修/评价、升级与真实同步客户端已实现，153项后端和前端6项通过；D4/M1 V3/M2 V2/M3 V2，D37/M1 10/M2 6/M3 10操作。实际M1封房/释放仍留Phase8，当前403如实SYNC_FAILED；运行和最终SHA见[Phase7验收](../review/phase-7-validation.md)。完成后等待Phase8，schema/公共契约保持待人工review。
 
 依据：[原始执行要求](../requirements/CODEX_EXECUTION_PROMPT.md)第 5–16、24、27、29 节。配套：[架构](ARCHITECTURE.md)、[ADR-001](../adr/ADR-001-service-boundary.md)、[需求](../requirements/REQUIREMENTS.md)、[追踪表](../requirements/TRACEABILITY.md)。
 
@@ -105,7 +105,7 @@ Phase 2 的 reservation V1 为权限基线，Phase 4 V2 创建 room_gate、seat_
 
 ## 4. M2 与 M3：业务状态与占用状态分开管理
 
-Phase 2 的 `classroom`、`maintenance` V1 只建立迁移版本/权限基线，无审批、申请或工单表。M2本轮追加V2四表，M3表随Phase7创建；不以占位业务表固定未定状态与字段。
+Phase 2 的 `classroom`、`maintenance` V1 只建立迁移版本/权限基线，无审批、申请或工单表。M2本轮追加V2四表，M3表本轮追加V2；不以占位业务表固定未定状态与字段。
 
 M2 拥有 `classroom_request`、`approval_step`、`approval_action`、`classroom_event`，包含审批链、审批决定和自身同步状态。批准后先进入 `APPROVED_PENDING_SYNC`，真实调用 M1 成功后进入 `APPROVED`；失败经规定的有界重试进入 `SYNC_FAILED`，不得将未确认同步伪装成已完成批准。
 
@@ -128,7 +128,7 @@ M2/M3 只能通过 `POST /internal/v1/room-blocks` 和 `DELETE /internal/v1/room
 | Web | 各模块公开业务数据 | 对应后端服务 | 公开 API，无数据库访问权 |
 | 可选 Agent | 源指定业务操作 | 对应后端服务 | 公开 API，继承真实用户权限，不直连数据库 |
 
-本矩阵保留目标责任边界。Phase 5 在真实 M1→D 身份/资源/参数调用上增加当日码验证和持久通知，六个 D 内部操作不经网关公开。M1 签到与 NO_SHOW 本地事务不跨 schema；提醒 HTTP 与 D 入箱具有独立提交，不声称可以原子撤回。M2本轮业务及真实D/M1客户端已实现；M3业务和通用远程审计接口仍未实现；新增契约均待人工 review。
+本矩阵保留目标责任边界。Phase 5 在真实 M1→D 身份/资源/参数调用上增加当日码验证和持久通知，六个 D 内部操作不经网关公开。M1 签到与 NO_SHOW 本地事务不跨 schema；提醒 HTTP 与 D 入箱具有独立提交，不声称可以原子撤回。M2本轮业务及真实D/M1客户端已实现；M3业务本轮已实现，通用远程审计接口仍未提供；新增契约均待人工 review。
 
 ## 6. 时间、迁移与保留策略
 
@@ -154,7 +154,7 @@ Phase 4 以真实 D JAR/HTTP 与 Testcontainers PostgreSQL 验证 M1 查询/插�
 
 Phase5的D V4/M1 V3、当日码签到、严格截止、锁等待跨截止、重复扫描/接收、停机补偿、签到抑制和违约原子释放已通过真实HTTP/PostgreSQL与可注入Clock验证，102项及实际升级结果见[历史Phase5验收](../review/phase-5-validation.md)。完整 Web 仍在 Phase 9，违约保存期限不因模型已建立而视为获批。
 
-## Phase 6 当前实现与明确依赖
+## Phase6实现记录（历史）
 
 M2追加V2四表classroom_request、approval_step、approval_action、classroom_event；D仍V4/M1 V3/M3 V1，旧迁移不改写。D36/M1 10/M2 6操作。D本人room-scopes要求当前classroom:approve，ROOM_ADMIN/DEPARTMENT_ADMIN可显式分配房间；两角色均移除则清除范围，D空间维护仍按原ROOM_ADMIN/系统管理员规则，部门范围不扩大空间或取码权限。不新增部门模型或seed用户。
 
@@ -162,4 +162,14 @@ M2通过真实D HTTP验证身份/权限/范围和启用CLASSROOM，无D签名秘
 
 同步通过独立M1_CLASSROOM_TOKEN真实POST M1 room-blocks，来源classroom-request:ID；30秒持久lease/令牌、3次总尝试、网络/5xx退避30/60秒、4xx/坏回执终止。两个30秒任务/池2，HTTP不持本地锁，迟到回执核对状态/令牌。当前真实M1接口属于Phase8尚未提供，直接403正确记SYNC_FAILED，不制造APPROVED或M1占用。客户端成功回执分支仅由明确外部响应夹具验证；批准后取消/到期释放/未知提交补偿与真实封房仍留Phase8。
 
-完整clean reactor130项通过，运行升级与最终SHA证据见[Phase6验收](../review/phase-6-validation.md)。早期Phase0–5文字保留历史，不能把旧阶段未实现描述当作当前M2不存在，也不能把当前M2审批当作Phase8已完成。Phase6结束等待Phase7，完整Web在Phase9。
+完整clean reactor130项通过，运行升级与最终SHA证据见[Phase6验收](../review/phase-6-validation.md)。早期Phase0–5文字保留历史，不能把旧阶段未实现描述当作当前M2不存在，也不能把当前M2审批当作Phase8已完成。Phase6历史交付已完成，完整Web在Phase9。
+
+## Phase7物业工单与当前边界
+
+M3追加V2三表repair_ticket、ticket_event、ticket_review，D4/M1 V3/M2 V2保持；已发布migration不改写。公开操作D37/M1 10/M2 6/M3 10，M3身份/房间/被派人员资格全部真实D HTTP；不共享D签名秘密、不跨schema。D仅向M3凭据返回当前id/eligible，部门/物业角色不隐式取得其他模块管理权限。
+
+报修STUDENT+maintenance:report，派单PROPERTY_MANAGER+maintenance:assign，被指派PROPERTY_STAFF开始/完工，报修人验收/返修/取消/一次评价；禁止指派报修人自己，SYSTEM_ADMIN无默认覆盖。指派due_at默认24小时，返修新周期并重新计时；超时每周期只写一次ESCALATED系统事件，公开escalated供Phase9标记。
+
+ASSIGNED→BLOCKING_ROOM→真实匹配ACTIVE回执→IN_PROGRESS；完工WAITING_ACCEPTANCE，报修人接受排入RELEASE，确认RELEASED才COMPLETED。拒绝验收回IN_PROGRESS并保持同一占用。仅REPORTED/ASSIGNED可取消，开始同步后无确认释放不能假取消。M3使用独立M1_MAINTENANCE_TOKEN、稳定M3/MAINTENANCE来源、开放结束时间；三次总尝试/30、60秒退避/4xx终止/30秒持久租约令牌，HTTP出事务。当前实际M1仍403，正确SYNC_FAILED，不冒称房间已下架或恢复。真实封房、释放、未知回执人工补偿留Phase8。
+
+153项完整clean reactor及四份OpenAPI验证通过，运行升级与最终SHA证据见[Phase7验收](../review/phase-7-validation.md)。全部业务Web仍在Phase9，CI在Phase11；本轮完成后等待Phase8。原有文档中的历史Phase0–6证据不作当前阶段结果替代。

@@ -6,7 +6,7 @@ Phase0–6已交付，用户在Phase6交付后确认继续，现已授权Phase7�
 
 需求依据是 [原始执行文档](docs/requirements/CODEX_EXECUTION_PROMPT.md)，规范化需求见 [REQUIREMENTS](docs/requirements/REQUIREMENTS.md)，状态见 [TRACEABILITY](docs/requirements/TRACEABILITY.md)。保留未完成需求，不以删除条目消除欠账。发现冲突或歧义，记录并交由人工确认，不悄悄改写需求。
 
-Phase7允许M3报修、派单、开始、完工、验收/拒绝验收、前置取消、评价、超时升级及真实M1同步客户端；D仅增加M3可访问的当前维修人员资格读取。保留Phase0–6；M1真实封房/释放接口留Phase8，生产失败必须如实保存SYNC_FAILED。完整Web/CI仍留对应阶段。不扩充五个seed用户。schema/公共契约与未定政策以具体可运行草稿PR人工review，不预先当成批准。
+Phase7允许M3报修、派单、开始、完工、验收/拒绝验收、前置取消、评价、超时升级及真实M1同步客户端；D仅增加M3可访问的当前维修人员资格读取。保留Phase0–6；M1真实封房/释放接口留Phase8，生产失败必须如实保存SYNC_FAILED。完整Web/CI仍留对应阶段。不扩充五个seed用户。schema/公共契约与未定政策以具体可运行草稿PR人工review，不预先当成批准。用户另授权Phase7完成后整理五人任务文档，属于交接说明，不授权提前编写Phase8业务。
 
 ## 工程原则
 

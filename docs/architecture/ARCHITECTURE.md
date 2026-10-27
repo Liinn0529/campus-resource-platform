@@ -1,6 +1,6 @@
 # 校园资源服务平台架构基线
 
-状态：Phase6申请、两级审批、拒绝、前置撤销、超时与持久同步已实现，130项后端及首轮真实运行验收通过。D4/M1 V3/M2 V2/M3 V1，D36/M1 10/M2 6操作；schema/公共契约仍待草稿PR人工review。真实M1封房/释放留Phase8，当前403明确记SYNC_FAILED；完整Web留Phase9。验证和最终干净版本证据见[Phase6验收](../review/phase-6-validation.md)，完成后等待Phase7。
+状态：当前Phase7工单、验收/返修/评价、升级与真实同步客户端已实现，153项后端和前端6项通过；D4/M1 V3/M2 V2/M3 V2，D37/M1 10/M2 6/M3 10操作。实际M1封房/释放仍留Phase8，当前403如实SYNC_FAILED；运行和最终SHA见[Phase7验收](../review/phase-7-validation.md)。完成后等待Phase8，schema/公共契约保持待人工review。
 
 依据：[原始执行要求](../requirements/CODEX_EXECUTION_PROMPT.md)第 1–40 节及 Phase 0–15。完整需求和状态以 [REQUIREMENTS.md](../requirements/REQUIREMENTS.md) 与 [TRACEABILITY.md](../requirements/TRACEABILITY.md) 为准；数据归属见 [DATA_OWNERSHIP.md](DATA_OWNERSHIP.md)，边界决策见 [ADR-001](../adr/ADR-001-service-boundary.md)。
 
@@ -8,7 +8,7 @@
 
 采用 Monorepo、前后端分离、4 个后端服务、REST API 和 PostgreSQL。核心业务结果由确定性的业务规则、权限检查、状态机和数据库约束产生。优先保证真实运行、可测试、可追踪与简单维护。
 
-Phase 0 为文档基线，Phase 1/2 建立工程和隔离数据库，Phase 3 交付 D 身份/资源/参数/每日码/审计，Phase 4 交付 M1 基础预约与来源账本。Phase 5 在同一边界内增加 M1 签到与持久提醒/NO_SHOW/违约、D 真实站内收件箱，保留独立账号和 HTTP 调用。Phase6追加M2申请审批与真实同步HTTP客户端；M3业务、M1占用写接口、完整Web及CI/CD仍按后续阶段实施。
+Phase 0 为文档基线，Phase 1/2 建立工程和隔离数据库，Phase 3 交付 D 身份/资源/参数/每日码/审计，Phase 4 交付 M1 基础预约与来源账本。Phase 5 在同一边界内增加 M1 签到与持久提醒/NO_SHOW/违约、D 真实站内收件箱，保留独立账号和 HTTP 调用。Phase6追加M2申请审批与真实同步HTTP客户端；本轮Phase7追加M3工单；M1占用写接口、完整Web及CI/CD仍按后续阶段实施。
 
 禁止为课程项目引入 Kafka、Nacos、Consul、Service Mesh、Event Sourcing、CQRS 等非必要基础设施。第一版不使用 Redis，也不使用 Redis 锁、分布式事务或 BPMN 引擎。不得用生产 mock、假接口、假数据或默认成功掩盖缺失能力。
 
@@ -34,7 +34,7 @@ flowchart LR
     M3 -->|HTTP：创建 / 释放维修占用| M1
 ```
 
-图中箭头表示调用依赖，不表示共享数据库权限。D 是身份、空间主数据和公共能力的所有者；M1/M2/M3 访问这些服务数据必须通过 HTTP，具体公开契约须在相应阶段设计并人工 Review。Phase 3 的 D JWT 使用 HS256/issuer/audience/到期/authVersion 和实时 DB 权限；三个内部调用方使用独立 opaque 凭据，只有 M1 可验码。Phase 4 的 M1 每次将用户 JWT 转发 D `/api/v1/me` 获得当前身份/权限，另用专属 opaque 凭据读目录/参数；M1 不持有 D 签名秘密、不读 D 表。M2本轮增加当前本人范围及独立M1调用凭据；M3与正式组织政策留后续验证，方案仍待人工 review。
+图中箭头表示调用依赖，不表示共享数据库权限。D 是身份、空间主数据和公共能力的所有者；M1/M2/M3 访问这些服务数据必须通过 HTTP，具体公开契约须在相应阶段设计并人工 Review。Phase 3 的 D JWT 使用 HS256/issuer/audience/到期/authVersion 和实时 DB 权限；三个内部调用方使用独立 opaque 凭据，只有 M1 可验码。Phase 4 的 M1 每次将用户 JWT 转发 D `/api/v1/me` 获得当前身份/权限，另用专属 opaque 凭据读目录/参数；M1 不持有 D 签名秘密、不读 D 表。Phase6增加M2本人范围及独立M1凭据，本轮M3增加当前人员资格与独立M1凭据；正式组织政策留后续review，方案仍待人工 review。
 
 M1 的房间、座位查询可以结合 D 主数据与自身占用数据，但不能直接读取 `platform` 表。M2/M3 对教室不可用的影响只能经由 M1 占用 API；D 的空间主数据管理不能直接修改 M1 账本。未规定 M2 与 M3 直接相互调用。
 
@@ -109,7 +109,7 @@ Phase 5 草案用 `[T−15min,T+15min)` 作为本人 CREATED 签到窗口；真�
 
 D 在 Phase 3 的具体方案为每日每房间一个 8 位随机字符签到码，Clock/显式 ZoneId 决定今日、room/date 主键保证唯一、同日 ensure 不轮换；二维码载荷尚未实现。Phase 5 的 M1 经真实 D 验码后校验本人预约、窗口与账本并记录签到。首版不做 GPS、人脸识别、蓝牙和 NFC。
 
-M2 第一版审批链为普通学生 → `ROOM_ADMIN` → `DEPARTMENT_ADMIN`。M3 使用 `due_at` 和定时扫描记录 escalation event 并在 UI 标记。Phase6每级审批激活默认24小时并封顶开始时间；维修时限和正常完成触发仍未定义。Phase 5 的签到/NO_SHOW 具体政策与 Phase 4 时间/取消草案均待人工 review，不据测试或阶段授权推定已批准。
+M2 第一版审批链为普通学生 → `ROOM_ADMIN` → `DEPARTMENT_ADMIN`。M3 使用 `due_at` 和定时扫描记录 escalation event 并在 UI 标记。Phase6每级审批激活默认24小时并封顶开始时间；Phase7维修时限默认24小时形成待审草案，M1正常完成触发仍未定义。Phase 5 的签到/NO_SHOW 具体政策与 Phase 4 时间/取消草案均待人工 review，不据测试或阶段授权推定已批准。
 
 提醒的有效窗口为首轮 `[T−15,T+10)`、次轮 `[T+10,T+15)`。独立扫描和发送任务默认各每30秒、每批100，调度池2，使 D 网络等待不阻塞 NO_SHOW 扫描。发送使用持久 claim/30秒 lease，最多3次总尝试，网络/5xx按30/60秒退避，4xx/坏响应终止。停机恢复优先处理过期 NO_SHOW，跳过失去意义的提醒；取消/签到抑制待发项。HTTP 在房间锁/事务外发送，发送前重查状态与到期，已在途的远端入箱不能与签到原子撤回，不能虚构跨服务回滚。
 
@@ -123,7 +123,7 @@ M2 第一版审批链为普通学生 → `ROOM_ADMIN` → `DEPARTMENT_ADMIN`。M
 
 生产要求 HTTPS only、参数化 SQL、CORS 白名单、无默认生产密码、Git 无凭据、数据库仅私网、内部 API 不公开、生产 Swagger 受限。内部调用身份认证及来源模块防伪规则必须在开放内部契约前明确，不能把请求体 `sourceModule` 当作可信调用身份。
 
-日志至少包含 `timestamp`、`level`、`service`、`requestId`、`userId`、`method`、`path`、`status`、`latencyMs`；不记录密码、JWT、refresh token、签到码明文或敏感个人信息。每个服务的 `/actuator/health` 和 `/actuator/info` 已在 Phase 1 分别实现，后者包含 `service`、`version`、`gitCommit`、`buildTime`；Phase 2 health 增加真实数据源连接检查，详情不对外暴露。D 在 Phase 3 已实现认证和模板化请求日志，实际日志抽查未出现本地私有凭据或生成码；M1 本轮接入远程身份、明确 CORS 和模板化请求/异常日志；实际全服务运行日志抽查仍以阶段证据为准，M2本轮已接入远程身份、CORS及模板化日志，M3随Phase7交付。
+日志至少包含 `timestamp`、`level`、`service`、`requestId`、`userId`、`method`、`path`、`status`、`latencyMs`；不记录密码、JWT、refresh token、签到码明文或敏感个人信息。每个服务的 `/actuator/health` 和 `/actuator/info` 已在 Phase 1 分别实现，后者包含 `service`、`version`、`gitCommit`、`buildTime`；Phase 2 health 增加真实数据源连接检查，详情不对外暴露。D 在 Phase 3 已实现认证和模板化请求日志，实际日志抽查未出现本地私有凭据或生成码；M1 本轮接入远程身份、明确 CORS 和模板化请求/异常日志；实际全服务运行日志抽查仍以阶段证据为准，M2本轮已接入远程身份、CORS及模板化日志，M3本轮接入同样的身份/CORS/模板日志边界。
 
 ## 8. 本地与华为云目标拓扑
 
@@ -137,7 +137,7 @@ flowchart TB
     APIs --> DB[单 PostgreSQL / 四 schema / 独立账号]
 ```
 
-此图保留本地拓扑。当前仅 Nginx 绑定 loopback，默认 `127.0.0.1:18080`，代理 Vue、四服务只读运行信息，`/api/v1/reservation/...` 与 `/api/v1/reservations`（含子路径）及 `/api/v1/violations` 到M1，`/api/v1/classroom-requests`及子路径到M2，其余 `/api/v1/` 到D；后端实际验证身份、权限与个人范围。数据库与后端无宿主端口，`/internal` 不经公共网关暴露；M2已开放六个操作，M3尚未开放业务API。具体配置见 `compose.yaml`、`deploy/nginx/nginx.conf` 及[本地手册](../runbooks/local-development.md)；后续服务间 HTTP 调用走内部网络。
+此图保留本地拓扑。当前仅 Nginx 绑定 loopback，默认 `127.0.0.1:18080`，代理 Vue、四服务只读运行信息，`/api/v1/reservation/...` 与 `/api/v1/reservations`（含子路径）及 `/api/v1/violations` 到M1，`/api/v1/classroom-requests`及子路径到M2，其余 `/api/v1/` 到D；后端实际验证身份、权限与个人范围。数据库与后端无宿主端口，`/internal` 不经公共网关暴露；M2已开放六个操作，M3本轮开放10操作。具体配置见 `compose.yaml`、`deploy/nginx/nginx.conf` 及[本地手册](../runbooks/local-development.md)；后续服务间 HTTP 调用走内部网络。
 
 ```mermaid
 flowchart TB
@@ -167,8 +167,8 @@ PR 质量门包括后端 lint/test、前端 lint/unit test、集成测试、构�
 | 3（已交付） | D 身份权限、资源、参数、签到码与审计 |
 | 4（已交付） | M1 基础预约、真实 D HTTP、房间锁与占用账本 |
 | 5（已交付） | M1签到、提醒、违约与释放；D持久站内收件箱 |
-| 6（本轮） | M2申请审批、撤销与超时，生产真实HTTP client；完成后等待Phase7 |
-| 7 | M3 工单、验收、评价与升级 |
+| 6（已交付） | M2申请审批、撤销与超时，真实HTTP客户端 |
+| 7（本轮） | M3工单、验收、评价与升级，完成后等待Phase8 |
 | 8 | M2→M1、M3→M1 的真实跨模块集成及相应 E2E |
 | 9 | 各角色完整 Web 流程 |
 | 10 | 测试体系、跨服务验证及 `scripts/test-all.sh` |
@@ -189,13 +189,13 @@ PR 质量门包括后端 lint/test、前端 lint/unit test、集成测试、构�
 1. DELETE 路径与三元幂等键的一致性；重复释放、已释放后重用业务引用及请求内容冲突比较规则。
 2. “最多 3 次”的计数含义、重试间隔/调度/恢复、4xx 最终状态及释放失败的同步状态。
 3. D 主数据变更与 M1 锁行生命周期；资源停用/删除对已存在预约与占用的影响。
-4. Phase 4 的整点/业务时区、半开区间、当前参数、开始前取消和历史再预约具体方案待 review；Phase 5 对签到窗口、NO_SHOW 和站内提醒已有具体待审方案；Phase6每级审批默认24小时并封顶开始时间形成待审草案；正常自动完成和维修超时仍未定。
+4. Phase 4 的整点/业务时区、半开区间、当前参数、开始前取消和历史再预约具体方案待 review；Phase 5 对签到窗口、NO_SHOW 和站内提醒已有具体待审方案；Phase6每级审批默认24小时并封顶开始时间形成待审草案；Phase7维修期限默认24小时形成待审草案；正常自动完成仍未定。
 5. D 的 JWT、独立内部身份、SYSTEM_ADMIN 全局/ROOM_ADMIN 显式范围已有 Phase 3 待审方案；其他模块接入、部门范围、站内通知已形成持久去重/有界恢复草案，通用跨服务审计失败处理与其他渠道仍未完成。
 6. 违约、个人信息、审计及业务事件的保存周期；应在工程伦理记录中持续跟踪实际决定。
 
 上述问题作为持续未决事项保留。Phase 3 对 D 日码/身份/范围/响应、Phase 4 对 M1 基础时间/取消/锁行/占用给出具体待审方案，Phase 5 对签到/违约/站内提醒形成具体待审方案，未替 M2/M3 释放重试和正常完成/保留生命周期作决定；数据库与公共契约仍须人工 Review，不能以测试、执行授权或上传仓库推定架构已获批准。
 
-## Phase 6 当前实现与明确依赖
+## Phase6实现记录（历史）
 
 M2追加V2四表classroom_request、approval_step、approval_action、classroom_event；D仍V4/M1 V3/M3 V1，旧迁移不改写。D36/M1 10/M2 6操作。D本人room-scopes要求当前classroom:approve，ROOM_ADMIN/DEPARTMENT_ADMIN可显式分配房间；两角色均移除则清除范围，D空间维护仍按原ROOM_ADMIN/系统管理员规则，部门范围不扩大空间或取码权限。不新增部门模型或seed用户。
 
@@ -203,4 +203,14 @@ M2通过真实D HTTP验证身份/权限/范围和启用CLASSROOM，无D签名秘
 
 同步通过独立M1_CLASSROOM_TOKEN真实POST M1 room-blocks，来源classroom-request:ID；30秒持久lease/令牌、3次总尝试、网络/5xx退避30/60秒、4xx/坏回执终止。两个30秒任务/池2，HTTP不持本地锁，迟到回执核对状态/令牌。当前真实M1接口属于Phase8尚未提供，直接403正确记SYNC_FAILED，不制造APPROVED或M1占用。客户端成功回执分支仅由明确外部响应夹具验证；批准后取消/到期释放/未知提交补偿与真实封房仍留Phase8。
 
-完整clean reactor130项通过，运行升级与最终SHA证据见[Phase6验收](../review/phase-6-validation.md)。早期Phase0–5文字保留历史，不能把旧阶段未实现描述当作当前M2不存在，也不能把当前M2审批当作Phase8已完成。Phase6结束等待Phase7，完整Web在Phase9。
+完整clean reactor130项通过，运行升级与最终SHA证据见[Phase6验收](../review/phase-6-validation.md)。早期Phase0–5文字保留历史，不能把旧阶段未实现描述当作当前M2不存在，也不能把当前M2审批当作Phase8已完成。Phase6历史交付已完成，完整Web在Phase9。
+
+## Phase7物业工单与当前边界
+
+M3追加V2三表repair_ticket、ticket_event、ticket_review，D4/M1 V3/M2 V2保持；已发布migration不改写。公开操作D37/M1 10/M2 6/M3 10，M3身份/房间/被派人员资格全部真实D HTTP；不共享D签名秘密、不跨schema。D仅向M3凭据返回当前id/eligible，部门/物业角色不隐式取得其他模块管理权限。
+
+报修STUDENT+maintenance:report，派单PROPERTY_MANAGER+maintenance:assign，被指派PROPERTY_STAFF开始/完工，报修人验收/返修/取消/一次评价；禁止指派报修人自己，SYSTEM_ADMIN无默认覆盖。指派due_at默认24小时，返修新周期并重新计时；超时每周期只写一次ESCALATED系统事件，公开escalated供Phase9标记。
+
+ASSIGNED→BLOCKING_ROOM→真实匹配ACTIVE回执→IN_PROGRESS；完工WAITING_ACCEPTANCE，报修人接受排入RELEASE，确认RELEASED才COMPLETED。拒绝验收回IN_PROGRESS并保持同一占用。仅REPORTED/ASSIGNED可取消，开始同步后无确认释放不能假取消。M3使用独立M1_MAINTENANCE_TOKEN、稳定M3/MAINTENANCE来源、开放结束时间；三次总尝试/30、60秒退避/4xx终止/30秒持久租约令牌，HTTP出事务。当前实际M1仍403，正确SYNC_FAILED，不冒称房间已下架或恢复。真实封房、释放、未知回执人工补偿留Phase8。
+
+153项完整clean reactor及四份OpenAPI验证通过，运行升级与最终SHA证据见[Phase7验收](../review/phase-7-validation.md)。全部业务Web仍在Phase9，CI在Phase11；本轮完成后等待Phase8。原有文档中的历史Phase0–6证据不作当前阶段结果替代。

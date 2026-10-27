@@ -32,7 +32,7 @@ function displayTime(value: string) {
       aria-labelledby="page-title"
     >
       <p class="eyebrow">
-        PHASE 06 · 教室申请与审批
+        PHASE 07 · 物业报修工单
       </p>
       <h1 id="page-title">
         服务运行状态
@@ -41,7 +41,7 @@ function displayTime(value: string) {
         检查基础服务是否在线，以及当前运行的构建版本。
       </p>
       <div class="scope-note">
-        已提供预约、签到与整教室申请审批接口。本页用于运行检查；教室占用联动、报修和完整业务页面将在后续阶段开放。
+        已提供预约、教室审批与物业工单接口。本页用于运行检查；房间占用联动和完整业务页面将在后续阶段开放。
       </div>
     </section>
 
