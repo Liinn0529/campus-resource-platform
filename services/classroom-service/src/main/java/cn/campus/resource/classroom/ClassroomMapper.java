@@ -12,7 +12,7 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 @Mapper
-interface ClassroomMapper {
+interface ClassroomMapper extends ReleaseMapper {
     record RequestRow(long id, long applicantId, long roomId, Instant startAt, Instant endAt, String purpose,
             String status, Instant submittedAt, Instant updatedAt, Instant approvalDueAt, int syncAttempts,
             Instant syncNextAttemptAt, UUID syncClaimToken, Instant syncClaimedUntil, String syncError, Long occupancyId) { }
@@ -20,7 +20,7 @@ interface ClassroomMapper {
             Long actorId, Instant decidedAt, Instant dueAt) { }
     record Action(long id, long requestId, int stepNumber, long actorId, String action,
             String reason, Instant occurredAt) { }
-    record Event(long id, long requestId, Long actorId, String action, UUID traceId, Instant occurredAt) { }
+    record Event(long id, long requestId, Long actorId, String action, UUID traceId, Instant occurredAt, String note) { }
 
     @Select(value = """
             INSERT INTO classroom.classroom_request
@@ -170,4 +170,16 @@ interface ClassroomMapper {
             WHERE id = #{id}
             """)
     int synchronizedState(@Param("id") long id, @Param("occupancyId") long occupancyId, @Param("now") Instant now);
+
+    @Update("UPDATE classroom.classroom_request SET sync_claim_token=#{token},sync_claimed_until=#{until},updated_at=#{now} WHERE id=#{id}")
+    int claimRecovery(@Param("id") long id,@Param("token") UUID token,@Param("until") Instant until,@Param("now") Instant now);
+    @Update("UPDATE classroom.classroom_request SET status=#{status},sync_error=NULL,sync_next_attempt_at=NULL,sync_claim_token=NULL,sync_claimed_until=NULL,updated_at=#{now} WHERE id=#{id}")
+    int releasedState(@Param("id") long id,@Param("status") String status,@Param("now") Instant now);
+    @Insert("INSERT INTO classroom.classroom_event(request_id,actor_id,action,trace_id,occurred_at,note) VALUES(#{id},#{actor},'RECOVERY_REQUESTED',#{trace},#{now},#{reason})")
+    int recoveryEvent(@Param("id") long id,@Param("actor") long actor,@Param("reason") String reason,@Param("trace") UUID trace,@Param("now") Instant now);
+
+    @Insert("INSERT INTO classroom.audit_outbox(source_event_id,action,entity_id,actor_user_id,occurred_at,source_request_id,next_attempt_at) "
+            + "SELECT 'classroom-event:'||e.id,e.action,e.request_id,e.actor_id,e.occurred_at,e.trace_id,e.occurred_at "
+            + "FROM classroom.classroom_event e WHERE e.request_id=#{id} ORDER BY e.id DESC LIMIT 1 ON CONFLICT(source_event_id) DO NOTHING")
+    int enqueueAudit(long id);
 }

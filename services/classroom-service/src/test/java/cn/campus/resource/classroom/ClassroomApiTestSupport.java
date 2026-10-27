@@ -176,7 +176,7 @@ abstract class ClassroomApiTestSupport {
     }
 
     protected void clearClassroomRows() {
-        for (String table : List.of("approval_action", "classroom_event", "approval_step", "classroom_request")) {
+        for (String table : List.of("audit_outbox", "request_release", "approval_action", "classroom_event", "approval_step", "classroom_request")) {
             jdbc.update("DELETE FROM classroom." + table);
         }
     }

@@ -17,7 +17,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 class ClassroomService {
     record View(long id, long applicantId, long roomId, Instant startAt, Instant endAt, String purpose,
             String status, Instant submittedAt, Instant updatedAt, Instant approvalDueAt,
-            int syncAttempts, String syncError, Long occupancyId) {
+            int syncAttempts, String syncError, Long occupancyId, String syncOperation, String releaseReason) {
         @Override public String toString() { return "ClassroomView[id=" + id + ",status=" + status + "]"; }
     }
     record Detail(View request, List<ClassroomMapper.Step> steps, List<ClassroomMapper.Action> actions,
@@ -135,8 +135,24 @@ class ClassroomService {
         return transactions.execute(transaction -> {
             var row = mapper.lockRequest(id);
             if (row == null || row.applicantId() != actor) { throw missing(); }
-            requireApprovalState(row);
             Instant now = clock.instant();
+            if (row.status().equals("APPROVED")) {
+                if (!now.isBefore(row.startAt())) {
+                    throw new ApiFailure(HttpStatus.CONFLICT,"CLASSROOM_CANCEL_TOO_LATE","已开始的教室申请不能取消");
+                }
+                queueRelease(row,"CANCEL",actor,now);
+                return view(mapper.request(id));
+            }
+            if (row.status().equals("APPROVED_PENDING_SYNC")) {
+                if (row.syncAttempts()!=0 || row.syncClaimToken()!=null) {
+                    throw new ApiFailure(HttpStatus.CONFLICT,"CLASSROOM_SYNC_UNCERTAIN","占用结果尚未确认，请由审批人核实同步结果");
+                }
+                requireFuture(row.startAt(),now);
+                mapper.syncFailure(id,"CANCELLED",null,null,now);
+                event(id,actor,"CANCELLED",now);
+                return view(mapper.request(id));
+            }
+            requireApprovalState(row);
             requireBeforeDeadline(row, now);
             mapper.closeSteps(id, "CANCELLED", now);
             mapper.approvalState(id, "CANCELLED", null, now);
@@ -145,7 +161,7 @@ class ClassroomService {
         });
     }
 
-    public void runOnce() { scanTimeouts(); syncDue(); }
+    public void runOnce() { scanTimeouts(); syncDue(); releaseDue(); }
 
     void scanTimeouts() {
         RuntimeException first = null;
@@ -216,6 +232,102 @@ class ClassroomService {
         });
     }
 
+
+    private void queueRelease(ClassroomMapper.RequestRow row,String reason,Long actor,Instant now) {
+        mapper.queue(row.id(),reason,now);
+        mapper.approvalState(row.id(),"RELEASING",null,now);
+        event(row.id(),actor,reason.equals("CANCEL")?"CANCEL_REQUESTED":"EXPIRY_RELEASE_REQUESTED",now);
+    }
+
+    void releaseDue() {
+        for (long id:mapper.expired(clock.instant())) {
+            transactions.executeWithoutResult(tx -> {
+                var row=mapper.lockRequest(id);Instant now=clock.instant();
+                if (row!=null && row.status().equals("APPROVED") && !now.isBefore(row.endAt())) {
+                    queueRelease(row,"EXPIRED",null,now);
+                }
+            });
+        }
+        RuntimeException first=null;
+        for (long id:mapper.due(clock.instant())) {
+            try { releaseOne(id); }
+            catch (RuntimeException failure) { if(first==null){first=failure;} }
+        }
+        if(first!=null){throw first;}
+    }
+
+    private void releaseOne(long id) {
+        Claim claim=transactions.execute(tx -> {
+            var row=mapper.lockRequest(id);var release=mapper.release(id);Instant now=clock.instant();
+            if(row==null || !row.status().equals("RELEASING") || release==null || !release.status().equals("PENDING")){return null;}
+            if(release.claimToken()!=null && now.isBefore(release.claimedUntil())){return null;}
+            if(release.claimToken()==null && now.isBefore(release.nextAttemptAt())){return null;}
+            if(release.attempts()>=3){
+                mapper.finish(id,"FAILED","M1_ACK_UNKNOWN",null);
+                mapper.syncFailure(id,"SYNC_FAILED","M1_ACK_UNKNOWN",null,now);
+                event(id,null,"SYNC_FAILED",now);return null;
+            }
+            UUID token=UUID.randomUUID();mapper.claim(id,token,now.plusSeconds(30));
+            event(id,null,"RELEASE_ATTEMPTED",now);return new Claim(row,token);
+        });
+        if(claim==null){return;}
+        OccupancyClient.SyncFailure error=null;
+        try{occupancy.release(claim.request());}catch(OccupancyClient.SyncFailure failure){error=failure;}
+        OccupancyClient.SyncFailure failure=error;
+        transactions.executeWithoutResult(tx -> {
+            var row=mapper.lockRequest(id);var release=mapper.release(id);
+            if(row==null || release==null || !row.status().equals("RELEASING") || !claim.token().equals(release.claimToken())){return;}
+            Instant now=clock.instant();
+            if(failure==null){confirmRelease(row,release,now);}
+            else{
+                boolean retry=failure.retryable() && release.attempts()<3;
+                mapper.finish(id,retry?"PENDING":"FAILED",failure.code(),retry?now.plusSeconds(30L*release.attempts()):null);
+                if(!retry){mapper.syncFailure(id,"SYNC_FAILED",failure.code(),null,now);}
+                event(id,null,retry?"RELEASE_RETRY_SCHEDULED":"SYNC_FAILED",now);
+            }
+        });
+    }
+
+    private void confirmRelease(ClassroomMapper.RequestRow row,ReleaseMapper.Release release,Instant now) {
+        mapper.finish(row.id(),"CONFIRMED",null,null);
+        mapper.releasedState(row.id(),release.reason().equals("CANCEL")?"CANCELLED":"COMPLETED",now);
+        event(row.id(),null,"RELEASE_CONFIRMED",now);
+    }
+
+    View recover(long id,String reason) {
+        Actor actor=access.actor();
+        Claim claim=transactions.execute(tx -> {
+            var row=mapper.lockRequest(id);
+            if(row==null){throw missing();}
+            if(!canReview(actor,row.roomId()) || actor.id()==row.applicantId()){throw forbidden();}
+            if(!row.status().equals("SYNC_FAILED")){throw new ApiFailure(HttpStatus.CONFLICT,"CLASSROOM_STATE_CONFLICT","仅失败同步可核实恢复");}
+            Instant now=clock.instant();
+            if(row.syncClaimToken()!=null && now.isBefore(row.syncClaimedUntil())){throw new ApiFailure(HttpStatus.CONFLICT,"CLASSROOM_BUSY","已有核实请求正在处理中");}
+            UUID token=UUID.randomUUID();mapper.claimRecovery(id,token,now.plusSeconds(30),now);
+            mapper.recoveryEvent(id,actor.id(),reason,UUID.fromString(RequestIds.current()),now);mapper.enqueueAudit(id);
+            return new Claim(row,token);
+        });
+        ReleaseMapper.Release release=mapper.release(id);
+        Long receipt=null;OccupancyClient.SyncFailure error=null;
+        try{receipt=release==null?occupancy.create(claim.request()):occupancy.release(claim.request());}
+        catch(OccupancyClient.SyncFailure failure){error=failure;}
+        Long confirmed=receipt;OccupancyClient.SyncFailure failure=error;
+        transactions.executeWithoutResult(tx -> {
+            var row=mapper.lockRequest(id);
+            if(row==null || !row.status().equals("SYNC_FAILED") || !claim.token().equals(row.syncClaimToken())){return;}
+            Instant now=clock.instant();
+            if(failure==null){
+                if(release==null){mapper.synchronizedState(id,confirmed,now);event(id,null,"OCCUPANCY_CONFIRMED",now);}
+                else{confirmRelease(row,release,now);}
+            }else{
+                mapper.syncFailure(id,"SYNC_FAILED",failure.code(),null,now);
+                if(release!=null){mapper.finish(id,"FAILED",failure.code(),null);}
+                event(id,null,"SYNC_FAILED",now);
+            }
+        });
+        return detail(id).request();
+    }
+
     private void requireRoom(long roomId) {
         var room = platform.room(roomId);
         if (!room.enabled() || !"CLASSROOM".equals(room.type())) {
@@ -263,13 +375,16 @@ class ClassroomService {
     }
 
     private View view(ClassroomMapper.RequestRow row) {
+        var release=mapper.release(row.id());
         return new View(row.id(), row.applicantId(), row.roomId(), row.startAt(), row.endAt(), row.purpose(), row.status(),
-                row.submittedAt(), row.updatedAt(), row.approvalDueAt(), row.syncAttempts(), row.syncError(), row.occupancyId());
+                row.submittedAt(), row.updatedAt(), row.approvalDueAt(),release==null?row.syncAttempts():release.attempts(),
+                release==null?row.syncError():release.error(),row.occupancyId(),release==null?"BLOCK":"RELEASE",release==null?null:release.reason());
     }
 
     private void event(long id, Long actor, String action, Instant now) {
         String trace = RequestIds.current();
         mapper.event(id, actor, action, trace == null ? UUID.randomUUID() : UUID.fromString(trace), now);
+        mapper.enqueueAudit(id);
     }
 
     private ApiFailure missing() { return new ApiFailure(HttpStatus.NOT_FOUND, "CLASSROOM_REQUEST_NOT_FOUND", "申请不存在"); }

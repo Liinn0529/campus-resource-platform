@@ -55,15 +55,19 @@ class OccupancyClient {
         this.http = builder.baseUrl(base).requestFactory(factory).build();
     }
 
-    long create(ClassroomMapper.RequestRow request) {
+    long create(ClassroomMapper.RequestRow request) { return synchronize(request, false); }
+    long release(ClassroomMapper.RequestRow request) { return synchronize(request, true); }
+
+    private long synchronize(ClassroomMapper.RequestRow request, boolean release) {
         String source = "classroom-request:" + request.id();
         try {
-            var response = http.post().uri("/internal/v1/room-blocks")
-                    .headers(headers -> headers.setBearerAuth(token))
-                    .body(new Block(request.roomId(), request.startAt(), request.endAt(), "M2", "CLASSROOM_BOOKING", source))
-                    .retrieve().toEntity(new ParameterizedTypeReference<Envelope>() { });
+            var call = release ? http.method(org.springframework.http.HttpMethod.DELETE)
+                    .uri("/internal/v1/room-blocks/M2/" + source) : http.post().uri("/internal/v1/room-blocks");
+            call.headers(headers -> headers.setBearerAuth(token));
+            if (!release) { call.body(new Block(request.roomId(), request.startAt(), request.endAt(), "M2", "CLASSROOM_BOOKING", source)); }
+            var response = call.retrieve().toEntity(new ParameterizedTypeReference<Envelope>() { });
             var body = response.getBody();
-            if ((response.getStatusCode().value() != 200 && response.getStatusCode().value() != 201)
+            if ((response.getStatusCode().value() != 200 && (release || response.getStatusCode().value() != 201))
                     || body == null || body.data() == null || body.requestId() == null
                     || body.requestId().isBlank() || body.requestId().length() > 64) {
                 throw new SyncFailure(false, "M1_INVALID_RECEIPT");
@@ -72,7 +76,8 @@ class OccupancyClient {
             if (row.id() <= 0 || row.roomId() != request.roomId() || !request.startAt().equals(row.startAt())
                     || !request.endAt().equals(row.endAt()) || !"M2".equals(row.sourceModule())
                     || !"CLASSROOM_BOOKING".equals(row.sourceType()) || !source.equals(row.sourceRefId())
-                    || !"ACTIVE".equals(row.status())) {
+                    || !(release ? "RELEASED" : "ACTIVE").equals(row.status())
+                    || (release && !Long.valueOf(row.id()).equals(request.occupancyId()))) {
                 throw new SyncFailure(false, "M1_INVALID_RECEIPT");
             }
             return row.id();

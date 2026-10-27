@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Campus maintenance work order API",
-    "version": "0.1.0",
-    "description": "Phase7 reviewable draft. DueAt/default24h and role/acceptance policies await human review. Real M1 blocking/release is Phase8; current actual403 is persisted SYNC_FAILED. External receipt fixtures are explicitly test-only."
+    "version": "0.2.0-member03",
+    "description": "Member03 Phase8/9 implementation draft; external M1/D interfaces and shared Web entry require their owners and independent review. No real cross-service success is claimed by response fixtures."
   },
   "servers": [
     {
@@ -743,6 +743,93 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/Rating"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/maintenance-tickets/{id}/recover": {
+      "post": {
+        "operationId": "recoverMaintenanceSynchronization",
+        "summary": "Explicit authorized synchronization recovery with a required reason",
+        "description": "Current scoped classroom approver (not applicant), or current PROPERTY_MANAGER with maintenance:assign, respectively. SYNC_FAILED only. One real idempotent HTTP attempt per explicit request. Original automatic attempts/history are retained; no force-success state. Unknown or mismatched receipts remain failed.",
+        "responses": {
+          "200": {
+            "description": "Explicit persisted result; pending synchronization is not completion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketEnvelope"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "405": {
+            "$ref": "#/components/responses/405"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "reason"
+                ],
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                }
               }
             }
           }

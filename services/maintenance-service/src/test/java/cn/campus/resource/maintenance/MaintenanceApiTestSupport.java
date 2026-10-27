@@ -176,7 +176,7 @@ abstract class MaintenanceApiTestSupport {
     }
 
     protected void clearMaintenanceRows() {
-        for (String table : List.of("ticket_review", "ticket_event", "repair_ticket")) {
+        for (String table : List.of("audit_outbox", "ticket_review", "ticket_event", "repair_ticket")) {
             jdbc.update("DELETE FROM maintenance." + table);
         }
     }

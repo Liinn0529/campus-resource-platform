@@ -63,4 +63,12 @@ interface MaintenanceMapper {
     @Update("UPDATE maintenance.repair_ticket SET status=#{status},sync_error=#{error},sync_next_attempt_at=#{next},sync_claim_token=NULL,sync_claimed_until=NULL,updated_at=#{now} WHERE id=#{id}")
     int failed(@Param("id") long id, @Param("status") String status, @Param("error") String error,
             @Param("next") Instant next, @Param("now") Instant now);
+
+    @Update("UPDATE maintenance.repair_ticket SET sync_claim_token=#{token},sync_claimed_until=#{until},updated_at=#{now} WHERE id=#{id}")
+    int claimRecovery(@Param("id") long id,@Param("token") UUID token,@Param("until") Instant until,@Param("now") Instant now);
+
+    @Insert("INSERT INTO maintenance.audit_outbox(source_event_id,action,entity_id,actor_user_id,occurred_at,source_request_id,next_attempt_at) "
+            + "SELECT 'maintenance-event:'||e.id,e.action,e.ticket_id,e.actor_user_id,e.created_at,#{trace},e.created_at "
+            + "FROM maintenance.ticket_event e WHERE e.ticket_id=#{id} ORDER BY e.id DESC LIMIT 1 ON CONFLICT(source_event_id) DO NOTHING")
+    int enqueueAudit(@Param("id") long id,@Param("trace") UUID trace);
 }

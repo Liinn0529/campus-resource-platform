@@ -26,4 +26,10 @@ class ClassroomScheduler {
         try { classroom.syncDue(); }
         catch (RuntimeException failure) { LOG.error("Classroom sync failed type={}", failure.getClass().getSimpleName()); }
     }
+
+    @Scheduled(fixedDelayString = "${campus.classroom.scan-delay-ms:30000}", initialDelayString = "${campus.classroom.scan-delay-ms:30000}")
+    void release() {
+        try { classroom.releaseDue(); }
+        catch (RuntimeException failure) { LOG.error("Classroom release failed type={}",failure.getClass().getSimpleName()); }
+    }
 }

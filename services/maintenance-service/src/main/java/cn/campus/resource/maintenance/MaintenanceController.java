@@ -14,6 +14,9 @@ class MaintenanceController {
     record Report(@NotNull @Positive Long roomId, @NotBlank @Size(max=500) String description) {
         @Override public String toString() { return "Report[content=redacted]"; }
     }
+    record Recovery(@NotBlank @Size(max=500) String reason) {
+        @Override public String toString(){return "Recovery[reason=redacted]";}
+    }
     record Assignment(@NotNull @Positive Long assigneeId) { }
     record Note(@NotBlank @Size(max=500) String note) {
         @Override public String toString() { return "Note[content=redacted]"; }
@@ -67,5 +70,10 @@ class MaintenanceController {
     @PostMapping("/api/v1/maintenance-tickets/{id}/review")
     ApiEnvelope<MaintenanceMapper.Review> review(@PathVariable @Positive long id,@Valid @RequestBody Rating input) {
         return ApiEnvelope.ok(maintenance.review(id,input));
+    }
+
+    @PostMapping("/api/v1/maintenance-tickets/{id}/recover")
+    ApiEnvelope<MaintenanceService.View> recover(@PathVariable @Positive long id,@Valid @RequestBody Recovery input) {
+        return ApiEnvelope.ok(maintenance.recover(id,input.reason()));
     }
 }

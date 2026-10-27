@@ -27,6 +27,9 @@ class ClassroomController {
             @NotNull OffsetDateTime endAt, @NotBlank @Size(max = 500) String purpose) {
         @Override public String toString() { return "Submit[content=redacted]"; }
     }
+    record Recovery(@NotBlank @Size(max=500) String reason) {
+        @Override public String toString(){return "Recovery[reason=redacted]";}
+    }
     record Decision(@Size(max = 500) String reason) {
         @Override public String toString() { return "Decision[reason=redacted]"; }
     }
@@ -65,5 +68,10 @@ class ClassroomController {
     @PostMapping("/api/v1/classroom-requests/{id}/cancel")
     ApiEnvelope<ClassroomService.View> cancel(@PathVariable @Positive long id) {
         return ApiEnvelope.ok(classroom.cancel(id));
+    }
+
+    @PostMapping("/api/v1/classroom-requests/{id}/recover")
+    ApiEnvelope<ClassroomService.View> recover(@PathVariable @Positive long id,@Valid @RequestBody Recovery input) {
+        return ApiEnvelope.ok(classroom.recover(id,input.reason()));
     }
 }

@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Campus classroom approval API",
-    "version": "0.1.0",
-    "description": "Phase6 reviewable draft. Real M1 internal room-blocks is a Phase8 dependency, currently403. APPROVED receipt branch is tested only against explicitly labeled external response fixtures; actual integration is not complete."
+    "version": "0.2.0-member03",
+    "description": "Member03 Phase8/9 implementation draft; external M1/D interfaces and shared Web entry require their owners and independent review. No real cross-service success is claimed by response fixtures."
   },
   "servers": [
     {
@@ -398,7 +398,7 @@
       "post": {
         "operationId": "cancelClassroomRequest",
         "summary": "Cancel own unfinished approval",
-        "description": "Owner only, SUBMITTED/APPROVING and before current deadline/start. Post-final pending/sync-failed/approved cancellation is denied until safe Phase8 release/compensation. No M1 deletion or fictitious rollback.",
+        "description": "Applicant: pending approvals before deadline/start; unattempted pending occupancy before start; or confirmed APPROVED before start. Confirmed occupancy queues RELEASING and only exact M1 release acknowledgement makes CANCELLED. Attempted/uncertain creates require authorized recovery first. At endAt, a scheduler releases APPROVED requests and confirms COMPLETED.",
         "responses": {
           "200": {
             "description": "Success; state is explicit in data",
@@ -459,6 +459,94 @@
             }
           }
         ]
+      }
+    },
+    "/api/v1/classroom-requests/{id}/recover": {
+      "post": {
+        "operationId": "recoverClassroomSynchronization",
+        "summary": "Explicit authorized synchronization recovery with a required reason",
+        "description": "Current scoped classroom approver (not applicant), or current PROPERTY_MANAGER with maintenance:assign, respectively. SYNC_FAILED only. One real idempotent HTTP attempt per explicit request. Original automatic attempts/history are retained; no force-success state. Unknown or mismatched receipts remain failed.",
+        "responses": {
+          "200": {
+            "description": "Success; state is explicit in data",
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "description": "Matches response requestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "405": {
+            "$ref": "#/components/responses/405"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "reason"
+                ],
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -575,7 +663,9 @@
               "REJECTED",
               "CANCELLED",
               "AUTO_CANCELLED",
-              "SYNC_FAILED"
+              "SYNC_FAILED",
+              "RELEASING",
+              "COMPLETED"
             ]
           },
           "submittedAt": {
@@ -605,6 +695,22 @@
             "format": "int64",
             "minimum": 1,
             "nullable": true
+          },
+          "syncOperation": {
+            "type": "string",
+            "enum": [
+              "BLOCK",
+              "RELEASE"
+            ]
+          },
+          "releaseReason": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "CANCEL",
+              "EXPIRED",
+              null
+            ]
           }
         },
         "required": [
@@ -773,6 +879,12 @@
           "occurredAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500,
+            "nullable": true,
+            "description": "Authorized recovery reason when applicable"
           }
         },
         "required": [

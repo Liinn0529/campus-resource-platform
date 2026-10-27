@@ -196,6 +196,33 @@ class MaintenanceService {
         });
     }
 
+
+    View recover(long id,String reason) {
+        Actor actor=access.actor();requireManager(actor);
+        Claim claim=transactions.execute(tx -> {
+            var row=required(id);requireState(row,"SYNC_FAILED");
+            if(row.syncOperation()==null){throw conflict();}
+            Instant now=clock.instant();
+            if(row.syncClaimToken()!=null && now.isBefore(row.syncClaimedUntil())){throw conflict();}
+            UUID token=UUID.randomUUID();mapper.claimRecovery(id,token,now.plusSeconds(30),now);
+            event(row,actor.id(),"RECOVERY_REQUESTED",reason,now);return new Claim(row,token);
+        });
+        Long receipt=null;OccupancyClient.SyncFailure error=null;
+        try{receipt=occupancy.synchronize(claim.ticket());}catch(OccupancyClient.SyncFailure failure){error=failure;}
+        Long result=receipt;OccupancyClient.SyncFailure failure=error;
+        transactions.executeWithoutResult(tx -> {
+            var row=mapper.lock(id);
+            if(row==null || !row.status().equals("SYNC_FAILED") || !claim.token().equals(row.syncClaimToken())
+                    || !claim.ticket().syncOperation().equals(row.syncOperation())){return;}
+            Instant now=clock.instant();
+            if(failure==null){
+                boolean release=row.syncOperation().equals("RELEASE");mapper.confirmed(id,release?"COMPLETED":"IN_PROGRESS",result,now);
+                event(row,null,release?"RELEASE_CONFIRMED":"OCCUPANCY_CONFIRMED",null,now);
+            }else{mapper.failed(id,"SYNC_FAILED",failure.code(),null,now);event(row,null,"SYNC_FAILED",null,now);}
+        });
+        return detail(id).ticket();
+    }
+
     private boolean manager(Actor actor) { return actor.roles().contains("PROPERTY_MANAGER") && actor.permissions().contains("maintenance:assign"); }
     private void requireManager(Actor actor) { if (!manager(actor)) { throw forbidden(); } }
     private void requireStaff(Actor actor,MaintenanceMapper.Ticket row) {
@@ -206,7 +233,9 @@ class MaintenanceService {
     private MaintenanceMapper.Ticket owned(long id,Actor actor) { var row=required(id); if(row.reporterId()!=actor.id()){throw missing();} return row; }
     private void requireState(MaintenanceMapper.Ticket row,String state) { if(!row.status().equals(state)){throw conflict();} }
     private void enabledRoom(long id) { if(!platform.room(id).enabled()){throw new ApiFailure(HttpStatus.UNPROCESSABLE_ENTITY,"MAINTENANCE_ROOM_DISABLED","房间未启用");} }
-    private void event(MaintenanceMapper.Ticket row,Long actor,String action,String note,Instant now) { mapper.event(row.id(),actor,action,row.repairCycle(),note,now); }
+    private void event(MaintenanceMapper.Ticket row,Long actor,String action,String note,Instant now) {
+        mapper.event(row.id(),actor,action,row.repairCycle(),note,now);mapper.enqueueAudit(row.id(),UUID.fromString(RequestIds.current()));
+    }
     private View view(MaintenanceMapper.Ticket r) { return new View(r.id(),r.reporterId(),r.roomId(),r.description(),r.status(),r.assigneeId(),r.reportedAt(),r.updatedAt(),r.dueAt(),r.repairCycle(),r.escalated(),r.blockStartAt(),r.occupancyId(),r.syncOperation(),r.syncAttempts(),r.syncError()); }
     private ApiFailure forbidden() { return new ApiFailure(HttpStatus.FORBIDDEN,"FORBIDDEN","无权执行此操作"); }
     private ApiFailure missing() { return new ApiFailure(HttpStatus.NOT_FOUND,"MAINTENANCE_NOT_FOUND","工单不存在"); }

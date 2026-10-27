@@ -83,7 +83,7 @@ public final class DatabaseTestSupport {
             PostgreSQLContainer<?> database, String ownSchema) throws SQLException {
         flyway.validate();
         assertThat(flyway.info().current()).isNotNull();
-        int version = ownSchema.equals("platform") ? 4 : ownSchema.equals("reservation") ? 3 : 2;
+        int version = ownSchema.equals("platform") ? 4 : 3;
         assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo(Integer.toString(version));
         assertThat(flyway.info().applied()).hasSize(version);
 
