@@ -1,6 +1,6 @@
 # 平台 API 契约（Phase 6 草稿）
 
-本文件描述 D 公共层的实际代码方案，完整机器契约为 [OpenAPI 3 JSON](../../contracts/openapi/platform.v1.json)。Phase 3 交付基础能力，Phase 4 增加内部房间目录及座位筛选，Phase 5 增加真实 M1 提醒接收和本人站内收件箱；真实结果以阶段验证记录为准，静态契约不能代替运行验证或人工审阅。运行信息端点另见 [runtime.md](runtime.md)。本文共列 36 个方法/路径组合。预约与实际签到由 M1 决定；审批、工单及通用远程审计写入仍留后续。
+本文件描述 D 公共层的实际代码方案，完整机器契约为 [OpenAPI 3 JSON](../../contracts/openapi/platform.v1.json)。Phase 3 交付基础能力，Phase 4 增加内部房间目录及座位筛选，Phase 5 增加真实 M1 提醒接收和本人站内收件箱；真实结果以阶段验证记录为准，静态契约不能代替运行验证或人工审阅。运行信息端点另见 [runtime.md](runtime.md)。本文共列 37个方法/路径组合。预约与实际签到由 M1 决定；M2审批与M3工单已由各自服务提供，通用远程审计写入仍留后续。
 
 ## 地址、认证与响应
 
@@ -148,3 +148,7 @@ M1 持久队列使用相同 sourceRefId 处理超时后回执未知和进程恢�
 `GET /api/v1/me/room-scopes` 要求当前用户具有 `classroom:approve`，返回成功 envelope，data 为本人已授权房间 ID 升序数组；不接收其他用户ID。缺失/失效JWT为401，当前无审批权限为403，不把拒绝改成空范围。系统管理员经原管理API向 ROOM_ADMIN 或 DEPARTMENT_ADMIN 显式分配范围，移除两类角色后清除范围；同一JWT下一请求立即看到当前范围/权限。
 
 部门范围仅用于M2审批，不授予D空间维护或签到码读取；D原ROOM_ADMIN/系统管理员的资源维护规则保持。M2仍须同时验证对应阶段角色、权限和明确房间范围，不能仅凭SYSTEM_ADMIN或一个审批权限越级。部门组织模型、完整Web和M1整房间占用集成不由这个接口冒充已完成。
+
+## Phase7维修人员资格
+
+`GET /internal/v1/maintenance-staff/{id}`仅maintenance-service专属凭据可调用；其他有效服务403，用户JWT/无效凭据401，非法ID400。200 envelope的data仅含id与eligible；当前enabled且PROPERTY_STAFF才true，不存在、停用或失去角色均false，不返回姓名/密码/权限。M3派单时真实调用此接口；不共享D表，不扩seed。

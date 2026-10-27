@@ -1,4 +1,4 @@
-# 运行端点契约（Phase 1–6）
+# 运行端点契约（Phase1–7）
 
 四服务均在容器内提供下列 GET 接口，无需业务身份。Phase 2 起服务启动必须通过各自 Flyway 迁移，健康检查使用应用账号检查 PostgreSQL 连接。完整业务 OpenAPI 留待相应业务阶段；这里不生成未实现的路径。
 
@@ -17,16 +17,24 @@ Spring Boot build-info 插件生成 BuildProperties，服务读取打包数据�
 
 四服务均不开放 actuator 根目录、env 及非 GET 运行端点。本地网关映射为 GET `/status/<模块名>/health` 和 `/status/<模块名>/info`；模块名仅 platform/reservation/classroom/maintenance。该路径的非 GET 请求返回 405；未经白名单的管理和所有内部路径返回 404。连接失败时网关返回 502/504 等实际错误，前端显示失败原因。
 
-Phase6网关将 `/api/v1/reservation/...` 与 `/api/v1/reservations`（含子路径）及 `/api/v1/violations` 转发 M1，`/api/v1/classroom-requests`及子路径转发M2，其余 `/api/v1/` 转发D。登录以外的公开业务 API 要求有效用户 JWT，缺失/无效为401、权限不足为403；本人预约对其他用户统一404。M1 每次通过真实 D `/api/v1/me` 校验当前身份，另用独立服务凭据读取目录/参数、校验房间当日码并请求持久站内接收；D 故障/超时/无效响应返回503。网关继续屏蔽 `/internal`，M2已开放六操作，M3尚无业务API。具体契约见 [platform.md](platform.md)、[reservation.md](reservation.md)和对应 [D](../../contracts/openapi/platform.v1.json)/[M1](../../contracts/openapi/reservation.v1.json) OpenAPI。
+Phase7网关将 `/api/v1/reservation/...` 与 `/api/v1/reservations`（含子路径）及 `/api/v1/violations` 转发 M1，`/api/v1/classroom-requests`及子路径转发M2，`/api/v1/maintenance-tickets`及子路径转发M3，其余 `/api/v1/` 转发D。登录以外的公开业务 API 要求有效用户 JWT，缺失/无效为401、权限不足为403；本人预约对其他用户统一404。M1 每次通过真实 D `/api/v1/me` 校验当前身份，另用独立服务凭据读取目录/参数、校验房间当日码并请求持久站内接收；D 故障/超时/无效响应返回503。网关继续屏蔽 `/internal`，M2已开放六操作，M3已开放10操作。具体契约见 [platform.md](platform.md)、[reservation.md](reservation.md)和对应 [D](../../contracts/openapi/platform.v1.json)/[M1](../../contracts/openapi/reservation.v1.json) OpenAPI。
 
 边界由四个 RuntimeEndpointsTest、前端状态聚合测试和 scripts/smoke-phase-1.py 分别验证，Phase 3 运行该脚本时须加 `--platform-api`。Phase 4 的 `scripts/smoke-phase-4.py` 先执行公共层回归再完成实际预约流程；Phase6另执行 `scripts/smoke-phase-6.py`；数据库检查使用 `scripts/check-database.py --phase6`，验证D V4/M1 V3/M2 V2/M3 V1和签到/违约/提醒账本。真实D JAR/HTTP与PostgreSQL测试另验证权限、首次并发锁和失败回滚；记录见各阶段验证报告。运行检查页不是完整业务 UI，主要角色页面留 Phase 9。
 
 Phase5已完成真实验证，历史结果见[Phase5验收](../review/phase-5-validation.md)。M1 默认独立30秒扫描/发送、调度池2，持久claim/lease和有界恢复；D站内ACCEPTED不代表邮件送达或用户已读。健康与版本端点只能证明进程/数据源与构建元数据，不能据此宣称调度、全部业务或CI通过；当前M2实际结果见[Phase6验证](../review/phase-6-validation.md)。
 
-## Phase6当前接口与验证
+## Phase6接口验证记录（历史）
 
-M2六操作见[教室API](../api/classroom.md)，D新增本人审批范围。M2使用D和M1两种独立opaque凭据，Compose配置PLATFORM_BASE_URL/PLATFORM_CLASSROOM_TOKEN及M1_BASE_URL/M1_CLASSROOM_TOKEN；init-env保留旧凭据并补齐新值，不输出秘密。现有D4/M1 V3保留，M2从V1升V2、M3仍V1，保留卷升级，无需删除数据。
+M2六操作见[教室API](../api/classroom.md)，D新增本人审批范围。M2使用D和M1两种独立opaque凭据，Compose配置PLATFORM_BASE_URL/PLATFORM_CLASSROOM_TOKEN及M1_BASE_URL/M1_CLASSROOM_TOKEN；init-env保留旧凭据并补齐新值，不输出秘密。现有D4/M1 V3保留，M2从V1升V2、M3为V2，保留卷升级，无需删除数据。
 
 运行 `python3 scripts/smoke-phase-6.py --expected-commit <实际构建SHA>` 先回归Phase5，再验证真实D范围、提交/两级审批/拒绝/撤销/撤权与实际M1 403→SYNC_FAILED；临时为现有第二学生赋部门角色/范围后恢复，不扩seed。不会声称真实封房成功。定时超时/成功回执/重试边界另由真实HTTP/PostgreSQL+Clock或明确外部响应夹具验证。`check-database.py --phase6`核对M2四表一致性和没有假APPROVED/M2占用的当前阶段基线。
 
 本地后端测试使用容器内部Linux工作区，公共Git源码归档不含.env；导出JAR、Surefire和JaCoCo XML，避免宿主同步class文件错误。完整130项通过，运行升级和最终SHA实际证据见[Phase6验收](../review/phase-6-validation.md)。完整角色Web/E2E留Phase9/10，M1占用/释放/恢复留Phase8；完成Phase6后停止等待Phase7。
+
+## Phase7工单运行验收
+
+当前D4/M1 V3/M2 V2/M3 V2；原卷自动追加M3 V2，无需删除数据。运行前执行init-env补齐独立M1_MAINTENANCE_TOKEN并保留旧值。D身份/资格与M1调用使用不同凭据，内部接口不经网关公开。工单公开路径/api/v1/maintenance-tickets，具体角色、请求和状态见[工单API](../api/maintenance.md)。
+
+运行 `python3 scripts/smoke-phase-7.py --expected-commit <实际构建SHA>`，先回归Phase6，再验证实际报修/派单/取消/即时撤权和真实M1拒绝后的SYNC_FAILED。只临时为原房间管理员增加主管角色，结束恢复原角色和空范围；不扩充seed。`python3 scripts/check-database.py --phase7`检查schema/账号、seed、账本、M2与M3事件/同步一致性。当前基线禁止假IN_PROGRESS/COMPLETED或M3占用，真实成功封房/释放留Phase8。
+
+后端完整153项通过，前端6项/lint/类型检查/构建通过；注入Clock验证超时，明确HTTP响应夹具验证完成/验收/返修/评价/释放，不冒充真实M1联调。运行结果见[Phase7验收](../review/phase-7-validation.md)。此页仍是运行检查，完整角色业务Web和升级标记属于Phase9。本轮完成后停止等待Phase8。

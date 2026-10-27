@@ -45,6 +45,7 @@ class InternalTokenFilter extends OncePerRequestFilter {
         }
         var authorities = new ArrayList<SimpleGrantedAuthority>();
         authorities.add(new SimpleGrantedAuthority("SERVICE_READ"));
+        if (matched == 2) { authorities.add(new SimpleGrantedAuthority("SERVICE_MAINTENANCE")); }
         if (matched == 0) { authorities.add(new SimpleGrantedAuthority("SERVICE_RESERVATION")); }
         SecurityContextHolder.getContext().setAuthentication(
                 UsernamePasswordAuthenticationToken.authenticated(CALLERS.get(matched), null, authorities));

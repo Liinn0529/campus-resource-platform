@@ -106,12 +106,20 @@ services:
         SERVICE_NAME: classroom-service
   maintenance-service:
     <<: *backend
+    depends_on:
+      postgres: {condition: service_healthy}
+      platform-service: {condition: service_healthy}
+      reservation-service: {condition: service_healthy}
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/campus_resource?currentSchema=maintenance
       DB_USERNAME: maintenance_app
       DB_PASSWORD: ${MAINTENANCE_DB_PASSWORD:?Run ./scripts/init-env.sh first}
       FLYWAY_USERNAME: maintenance_migrator
       FLYWAY_PASSWORD: ${MAINTENANCE_FLYWAY_PASSWORD:?Run ./scripts/init-env.sh first}
+      PLATFORM_BASE_URL: http://platform-service:8080
+      PLATFORM_MAINTENANCE_TOKEN: ${PLATFORM_MAINTENANCE_TOKEN:?Run ./scripts/init-env.sh first}
+      M1_BASE_URL: http://reservation-service:8080
+      M1_MAINTENANCE_TOKEN: ${M1_MAINTENANCE_TOKEN:?Run ./scripts/init-env.sh first}
     build:
       <<: *backend-build
       args:

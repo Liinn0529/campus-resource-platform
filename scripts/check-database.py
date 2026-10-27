@@ -38,9 +38,10 @@ def main():
     phase.add_argument("--phase3", action="store_true", help="Check platform V3, reference permissions and append-only audit")
     phase.add_argument("--phase4", action="store_true", help="Also check reservation V2 and workflow ledger consistency")
     phase.add_argument("--phase5", action="store_true", help="Check platform V4, reservation V3 and check-in/no-show/reminders")
+    phase.add_argument("--phase7", action="store_true", help="Also check maintenance V2 work orders, events and truthful sync")
     phase.add_argument("--phase6", action="store_true", help="Also check classroom V2 and approval/synchronization consistency")
     args = parser.parse_args()
-    platform_v3 = args.phase3 or args.phase4 or args.phase5 or args.phase6
+    platform_v3 = args.phase3 or args.phase4 or args.phase5 or args.phase6 or args.phase7
 
     expected_roles = sorted(schema + suffix for schema in SCHEMAS for suffix in ("_app", "_migrator"))
     rows = query("SELECT rolname || '|' || rolsuper || '|' || rolcreatedb || '|' || rolcreaterole || '|' "
@@ -52,13 +53,15 @@ def main():
 
     versions = {schema: (["1", "2", "3"] if platform_v3 and schema == "platform" else ["1"])
                 for schema in SCHEMAS}
-    if args.phase4 or args.phase5 or args.phase6:
+    if args.phase4 or args.phase5 or args.phase6 or args.phase7:
         versions["reservation"] = ["1", "2"]
-    if args.phase5 or args.phase6:
+    if args.phase5 or args.phase6 or args.phase7:
         versions["platform"] = ["1", "2", "3", "4"]
         versions["reservation"] = ["1", "2", "3"]
-    if args.phase6:
+    if args.phase6 or args.phase7:
         versions["classroom"] = ["1", "2"]
+    if args.phase7:
+        versions["maintenance"] = ["1", "2"]
     for schema in SCHEMAS:
         assert query("SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname='" + schema + "'") == schema + "_migrator"
         assert query("SELECT version || '|' || success FROM " + schema
@@ -102,12 +105,14 @@ def main():
     if platform_v3:
         evidence.pop("version")
         evidence["versions"] = versions
-    if args.phase4 or args.phase5 or args.phase6:
-        check_reservation_workflow(args.phase5 or args.phase6)
-    if args.phase5 or args.phase6:
+    if args.phase4 or args.phase5 or args.phase6 or args.phase7:
+        check_reservation_workflow(args.phase5 or args.phase6 or args.phase7)
+    if args.phase5 or args.phase6 or args.phase7:
         check_lifecycle()
-    if args.phase6:
+    if args.phase6 or args.phase7:
         check_classroom()
+    if args.phase7:
+        check_maintenance()
     if args.compare:
         assert json.loads(args.compare.read_text()) == evidence, "Data or existing passwords changed on restart"
         print("PASS: restart retained exact counts, migration versions and existing password hashes")
@@ -233,6 +238,31 @@ def check_classroom():
             ("classroom_request","approval_step","approval_action","classroom_event")}
     print("PASS: classroom V2 stages, owner separation, decisions/events and truthful Phase 8 dependency",json.dumps(counts,sort_keys=True))
 
+
+
+def check_maintenance():
+    assert query("SELECT count(*) FROM maintenance.repair_ticket t WHERE "
+                 "(SELECT count(*) FROM maintenance.ticket_event e WHERE e.ticket_id=t.id AND e.action='REPORTED')<>1", "maintenance") == "0"
+    assert query("SELECT count(*) FROM maintenance.repair_ticket t WHERE "
+                 "(t.status NOT IN ('REPORTED','CANCELLED') AND (t.assignee_id IS NULL OR t.due_at IS NULL)) "
+                 "OR t.assignee_id=t.reporter_id", "maintenance") == "0"
+    assert query("SELECT count(*) FROM maintenance.ticket_event e JOIN maintenance.repair_ticket t ON t.id=e.ticket_id "
+                 "WHERE e.action IN ('REPORTED','ACCEPT_REQUESTED','ACCEPTANCE_REJECTED','CANCELLED','REVIEWED') "
+                 "AND e.actor_user_id IS DISTINCT FROM t.reporter_id", "maintenance") == "0"
+    assert query("SELECT count(*) FROM maintenance.ticket_event e JOIN maintenance.repair_ticket t ON t.id=e.ticket_id "
+                 "WHERE e.action IN ('START_REQUESTED','FINISHED') AND e.actor_user_id IS DISTINCT FROM t.assignee_id", "maintenance") == "0"
+    assert query("SELECT count(*) FROM maintenance.repair_ticket t WHERE t.escalated AND NOT EXISTS "
+                 "(SELECT 1 FROM maintenance.ticket_event e WHERE e.ticket_id=t.id AND e.repair_cycle=t.repair_cycle AND e.action='ESCALATED')", "maintenance") == "0"
+    assert query("SELECT count(*) FROM maintenance.ticket_review r JOIN maintenance.repair_ticket t ON t.id=r.ticket_id "
+                 "WHERE t.status<>'COMPLETED' OR r.reviewer_id<>t.reporter_id", "maintenance") == "0"
+    # Phase7 live M1 has no room-block endpoint. A fixture must never produce live repair/receipt rows.
+    assert query("SELECT count(*) FROM maintenance.repair_ticket WHERE status IN ('IN_PROGRESS','WAITING_ACCEPTANCE','COMPLETED') OR occupancy_id IS NOT NULL", "maintenance") == "0"
+    assert query("SELECT count(*) FROM maintenance.repair_ticket WHERE status='SYNC_FAILED' "
+                 "AND (sync_operation<>'BLOCK' OR sync_error<>'M1_HTTP_403' OR sync_attempts<>1)", "maintenance") == "0"
+    assert query("SELECT count(*) FROM reservation.seat_occupancy WHERE source_module='M3'", "reservation") == "0"
+    counts={table:int(query("SELECT count(*) FROM maintenance."+table,"maintenance"))
+            for table in ("repair_ticket","ticket_event","ticket_review")}
+    print("PASS: maintenance V2 owner/staff decisions, escalation/review consistency and truthful Phase8 dependency", json.dumps(counts, sort_keys=True))
 
 if __name__ == "__main__":
     main()

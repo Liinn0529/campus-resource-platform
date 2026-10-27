@@ -1,0 +1,13 @@
+package cn.campus.resource.maintenance;
+
+import java.util.UUID;
+import org.slf4j.MDC;
+
+final class RequestIds {
+    private RequestIds() { }
+
+    static String current() {
+        String value = MDC.get("requestId");
+        return value == null ? UUID.randomUUID().toString() : value;
+    }
+}

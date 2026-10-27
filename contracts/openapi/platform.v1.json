@@ -2415,6 +2415,71 @@
           }
         }
       }
+    },
+    "/internal/v1/maintenance-staff/{id}": {
+      "get": {
+        "summary": "M3读取当前维修人员资格",
+        "operationId": "maintenanceStaffEligibility",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Only id and current eligibility; unknown/disabled/non-staff is false",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "eligible"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "format": "int64",
+                          "minimum": 1
+                        },
+                        "eligible": {
+                          "type": "boolean"
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid id"
+          },
+          "401": {
+            "description": "Invalid service identity"
+          },
+          "403": {
+            "description": "Only maintenance-service may call"
+          }
+        }
+      }
     }
   },
   "components": {
