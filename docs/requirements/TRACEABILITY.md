@@ -118,9 +118,9 @@ OQ-01..15全部保留。Phase 5对签到窗口、NO_SHOW、站内入箱/恢复�
 | REQ-M2-003 | 支持批准及驳回，必须按当前状态和审批步骤执行后端权限校验。 | M2 | POST approve/reject | 记录锁内状态/步骤守卫、并发单决定及损坏步骤原子回滚通过 | DONE | §五.3、十三; Phase 6 | 6 |
 | REQ-M2-004 | 支持申请撤销及审批超时自动撤销；超时阈值、可撤销状态和与占用释放的协调待确认。 | M2 | POST cancel; timeout job | 仅前置审批撤销/每级24h封顶开始、锁后Clock/到期自动取消测试通过；占用后释放另属M2-008 | DONE | §五.3、十三; Phase 6 | 6 |
 | REQ-M2-005 | 状态完整保留 SUBMITTED、APPROVING、APPROVED_PENDING_SYNC、APPROVED、REJECTED、CANCELLED、AUTO_CANCELLED、SYNC_FAILED。 | M2 | classroom_request状态约束 | 保留全部8状态；当前生产同步403失败，APPROVED分支仅明确回执夹具，真实成功仍见M2-006/010 | DONE | §十三 | 6 |
-| REQ-M2-006 | 最终批准流程为 APPROVING → APPROVED_PENDING_SYNC → 调 M1 → APPROVED，只有 M1 真实占用成功后才能显示 APPROVED。 | M2/M1 | OccupancyClient; sync job | 真实HTTP/持久pending/失败及回执校验已实现；M1真实成功封房仍待Phase8，不能以夹具称完成 | PARTIAL | §十 | 6/8 |
+| REQ-M2-006 | 最终批准流程为 APPROVING → APPROVED_PENDING_SYNC → 调 M1 → APPROVED，只有 M1 真实占用成功后才能显示 APPROVED。 | M2/M1 | OccupancyClient; sync job | 成员三补授权恢复及严格回执测试；真实M1成功链与非作者审核待完成，见docs/member03/HANDOFF.md | PARTIAL | §十 | 6/8 |
 | REQ-M2-007 | 占用同步失败保持明确中间态并按有限重试策略处理，最终失败标记 SYNC_FAILED，不默认审批成功。 | M2/M1 | ClassroomService.syncDue | 3总尝试、30/60退避、4xx终止、lease恢复/耗尽/迟到令牌；真实M1拒绝不假成功 | DONE | §十 | 6/8 |
-| REQ-M2-008 | 需要释放教室时调用 M1 释放契约，禁止直接删除 M1 记录；取消与正常到期释放规则待确认。 | M2/M1 | post-sync cancel guard; Phase8 release | 当前禁止pending/syncfailed无确认取消；真实DELETE释放/到期补偿尚未实现 | PARTIAL | §五.3、九 | 6/8 |
+| REQ-M2-008 | 需要释放教室时调用 M1 释放契约，禁止直接删除 M1 记录；取消与正常到期释放规则待确认。 | M2/M1 | post-sync cancel guard; Phase8 release | 成员三已实现批准后取消/到期DELETE、持久释放/恢复及PG测试；政策和真实M1复验待一/四审核 | PARTIAL | §五.3、九 | 6/8 |
 | REQ-M2-009 | 单元测试可以 mock M1，生产代码必须使用真实 HTTP client；单测 mock 不能当作跨模块集成证据。 | M2 | OccupancyClient; SynchronizationBoundaryTest | 生产真实HTTP独立凭据/禁重定向，明确夹具只测回执边界，不充当Phase8成功 | DONE | Phase 6 | 6 |
 | REQ-M2-010 | 真实验收：M2 审批成功 → HTTP M1 → 教室全部座位不可预约。 | M2/M1/Web | 审批页面 / availability | 计划，未执行：跨服务集成与 Playwright E2E | TODO | Phase 8 | 8 |
 
@@ -130,13 +130,13 @@ OQ-01..15全部保留。Phase 5对签到窗口、NO_SHOW、站内入箱/恢复�
 |---|---|---|---|---|---|---|---|
 | REQ-M3-001 | 支持 report 故障上报、工单查询与详情。 | M3 | M3 report/list/detail | 真实D/HTTP/PostgreSQL与实际网关提交、SQL可见过滤、一致详情通过 | DONE | §五.4、十四; Phase 7 | 7 |
 | REQ-M3-002 | 支持 assign 派单，派单动作由后端权限与状态守卫控制。 | M3 | assign; D staff eligibility | 当前PROPERTY_MANAGER+maintenance:assign，D实时enabled/PROPERTY_STAFF资格及非法状态/越权测试通过 | DONE | §五.4、十四; Phase 7 | 7 |
-| REQ-M3-003 | start 开始维修按 ASSIGNED → BLOCKING_ROOM → 调 M1 → IN_PROGRESS 执行，未成功占用不能假报维修下架完成。 | M3/M1 | start; OccupancyClient BLOCK | 真实M1当前403→SYNC_FAILED；匹配ACTIVE回执后IN_PROGRESS仅明确边界夹具通过，真实封房待Phase8 | PARTIAL | §十、十四; Phase 7 | 7/8 |
+| REQ-M3-003 | start 开始维修按 ASSIGNED → BLOCKING_ROOM → 调 M1 → IN_PROGRESS 执行，未成功占用不能假报维修下架完成。 | M3/M1 | start; OccupancyClient BLOCK | 保留真实BLOCK客户端与ACTIVE核对；新增授权恢复/PG测试；M1真实下架仍待成员一 | PARTIAL | §十、十四; Phase 7 | 7/8 |
 | REQ-M3-004 | 支持 finish 完工及 WAITING_ACCEPTANCE，完工到待验收的守卫需明确。 | M3 | finish | 当前被派PROPERTY_STAFF且IN_PROGRESS才WAITING_ACCEPTANCE；真实D/M3库加明确M1回执夹具验证 | DONE | §十四; Phase 7 | 7 |
-| REQ-M3-005 | 支持 accept 验收并完成工单；验收完成后通过 M1 恢复座位，释放失败恢复策略待确认。 | M3/M1 | accept; OccupancyClient RELEASE | 本人验收排RELEASE，匹配原ID/来源RELEASED才COMPLETED，失败保留占用；真实M1恢复仍待Phase8 | PARTIAL | §五.4、十四; Phase 7/8 | 7/8 |
+| REQ-M3-005 | 支持 accept 验收并完成工单；验收完成后通过 M1 恢复座位，释放失败恢复策略待确认。 | M3/M1 | accept; OccupancyClient RELEASE | 精确RELEASED后完成、失败保留、显式恢复/计数历史及PG测试已实现；M1真实恢复待联调 | PARTIAL | §五.4、十四; Phase 7/8 | 7/8 |
 | REQ-M3-006 | 支持 rejectAcceptance 拒绝验收；返回状态、后续返修及占用延续规则待确认。 | M3 | reject-acceptance | 本人拒绝验收回IN_PROGRESS、保留占用、增加周期并重开期限；排释放后拒绝409 | DONE | §十四 | 7 |
 | REQ-M3-007 | 支持 cancel 取消，需定义可取消状态及现有维修占用的释放规则。 | M3 | cancel | 本人仅REPORTED/ASSIGNED可取消；并发start/cancel一胜，开始同步后无确认释放不假取消 | DONE | §五.4、十四; Phase 7 | 7 |
 | REQ-M3-008 | 支持 review 评价，评价主体、次数与可评价阶段待确认。 | M3 | review | 仅报修人COMPLETED后一次1–5分/≤500字；越权/未完成/重复拒绝，真实库唯一评价 | DONE | §五.4、十四; Phase 7 | 7 |
-| REQ-M3-009 | 使用 due_at 定时扫描超时，写 escalation event 并在 UI 标记，不能仅改变展示而无事件。 | M3 | scanEscalations; escalated | due_at锁后Clock、达到即升级、每周期一次系统事件、返修重开均通过；完整Web标记待Phase9 | PARTIAL | §十四; Phase 7 | 7 |
+| REQ-M3-009 | 使用 due_at 定时扫描超时，写 escalation event 并在 UI 标记，不能仅改变展示而无事件。 | M3 | scanEscalations; escalated | 六页面显示真实escalated/dueAt/repairCycle；PG测试保留返修占用并清新周期标记；实际Web复验待成员四 | PARTIAL | §十四; Phase 7 | 7 |
 | REQ-M3-010 | 状态完整保留 REPORTED、ASSIGNED、BLOCKING_ROOM、IN_PROGRESS、WAITING_ACCEPTANCE、COMPLETED、CANCELLED、SYNC_FAILED。 | M3 | M3 V2状态约束 | 完整八状态、显式BLOCK/RELEASE、状态守卫和事件测试通过；实际集成另见M3-003/005/012 | DONE | §十四 | 7 |
 | REQ-M3-011 | 网络错误和 5xx 允许有限重试，4xx 不重试；超出次数进入 SYNC_FAILED。 | M3/M1 | syncDue; OccupancyClient | 三总尝试/30、60退避、4xx/坏回执终止、lease恢复及耗尽无第四次通过；真实403不重试 | DONE | §十 | 7/8 |
 | REQ-M3-012 | 真实验收：报修 → 开始维修 → HTTP M1 → 房间座位下架 → 验收完成 → M1 恢复。 | M3/M1/Web | 工单/座位页面 | 计划，未执行：跨服务集成与 Playwright E2E | TODO | Phase 8 | 8 |
@@ -191,13 +191,13 @@ OQ-01..15全部保留。Phase 5对签到窗口、NO_SHOW、站内入箱/恢复�
 |---|---|---|---|---|---|---|---|
 | REQ-UI-001 | 提供 /login 与 /student/home，以真实身份和业务数据呈现入口。 | Web/D | /login; /student/home | 计划，未执行：登录与学生首页 E2E | TODO | §二十 | 9 |
 | REQ-UI-002 | 提供自习室列表、详情、预约列表、详情及历史五类页面，完整保留附录 E 路由。 | Web/M1 | /student/rooms; /student/rooms/:id; /student/reservations; /student/reservations/:id; /student/history | 计划，未执行：搜索、预约、取消、签到、历史与再预约 E2E | TODO | §二十 | 9 |
-| REQ-UI-003 | 提供学生整教室申请及报修页面。 | Web/M2/M3 | /student/classroom-applications; /student/repairs | 计划，未执行：提交、查询及可用操作 E2E | TODO | §二十 | 9 |
-| REQ-UI-004 | 提供审批列表和审批详情。 | Web/M2 | /approvals; /approvals/:id | 计划，未执行：各级审批、驳回及权限 E2E | TODO | §二十 | 9 |
-| REQ-UI-005 | 提供维修工单列表和详情。 | Web/M3 | /maintenance; /maintenance/:id | 计划，未执行：派单、维修、验收、评价及超时标记 E2E | TODO | §二十 | 9 |
+| REQ-UI-003 | 提供学生整教室申请及报修页面。 | Web/M2/M3 | /student/classroom-applications; /student/repairs | 成员三两学生页面/详情/操作/分页/错误已实现，类型测试和隔离入口构建通过；生产公共入口待成员二 | PARTIAL | §二十 | 9 |
+| REQ-UI-004 | 提供审批列表和审批详情。 | Web/M2 | /approvals; /approvals/:id | 成员三审批列表/详情/两级/期限/权限提示已实现；真实授权与公共入口浏览器验收待完成 | PARTIAL | §二十 | 9 |
+| REQ-UI-005 | 提供维修工单列表和详情。 | Web/M3 | /maintenance; /maintenance/:id | 成员三工单列表/详情/派单至评价已实现；D最小人员接口与真实M1联调待完成 | PARTIAL | §二十 | 9 |
 | REQ-UI-006 | 提供空间、房间、座位、用户、角色、设置、审计七个管理页面。 | Web/D | /admin/spaces; /admin/rooms; /admin/seats; /admin/users; /admin/roles; /admin/settings; /admin/audit | 计划，未执行：管理流程及学生访问拒绝 E2E | TODO | §二十 | 9 |
 | REQ-UI-007 | UI 清晰、克制、业务化、响应式；学生端 Mobile friendly，管理端 Desktop first。 | Web | 全部页面 | 计划，未执行：手机及桌面尺寸人工验收 | TODO | §二十一 | 9 |
 | REQ-UI-008 | 避免大量渐变、无意义动画、AI 风格装饰、Fake Dashboard、无真实来源图表。 | Web | 全部页面 | 计划，未执行：视觉与数据来源审查 | TODO | §二十一 | 9 |
-| REQ-UI-009 | 学生、审批、维修、管理主要业务通过 Web 完成，无需 Postman。 | Web/全服务 | 全角色业务页面 | 计划，未执行：真实账号端到端人工验收 | TODO | Phase 9 | 9 |
+| REQ-UI-009 | 学生、审批、维修、管理主要业务通过 Web 完成，无需 Postman。 | Web/全服务 | 全角色业务页面 | 成员三6路由及真实API隔离宿主已实现；其余14路由和20路由总验收待成员二/四 | PARTIAL | Phase 9 | 9 |
 
 ## 测试层次与有效性
 
@@ -259,7 +259,7 @@ OQ-01..15全部保留。Phase 5对签到窗口、NO_SHOW、站内入箱/恢复�
 | REQ-ETH-004 | 记录日志数据相关风险及处置，遵守敏感字段禁止记录要求。 | 全服务 | D 请求/异常/审计日志; ETHICS_LOG | 已记录日志最小化与审计保留风险；本轮实际 D 日志抽查无私有凭据/生成码，未来模块/部署继续处置和审阅 | PARTIAL | §三十八 | 1 起持续 |
 | REQ-ETH-005 | 记录 Agent 越权风险与基于 API 权限的约束措施。 | Optional | Agent / ETHICS_LOG | 计划，未执行：越权测试与风险处置 | TODO | §三十八 | 15 可选 |
 | REQ-ETH-006 | 记录自动撤销风险，包括时间边界、错误处置和受影响用户的处理。 | M1/M2 | NO_SHOW / 审批超时 | 计划，未执行：边界案例与伦理决策记录 | TODO | §三十八 | 5/6 起持续 |
-| REQ-ETH-007 | 记录维修下架误伤风险及对既有预约的处理决策。 | M3/M1 | ETHICS_LOG Phase7 | 已记录维修误伤/既有预约不静默取消、验收释放失败/未知回执风险；实际冲突告知/恢复待Phase8review | PARTIAL | §三十八 | 7/8 起持续 |
+| REQ-ETH-007 | 记录维修下架误伤风险及对既有预约的处理决策。 | M3/M1 | ETHICS_LOG Phase7 | 补充精确释放/未知回执/恢复权限和最小审计字段的实际处理；既有预约冲突/告知政策仍待一/四 | PARTIAL | §三十八 | 7/8 起持续 |
 
 ## 后续阶段范围与验收门禁
 
@@ -273,7 +273,7 @@ OQ-01..15全部保留。Phase 5对签到窗口、NO_SHOW、站内入箱/恢复�
 | REQ-PH-006 | 实现 submit、approval、approve、reject、cancel、timeout；单元测试可 mock M1，生产必须真实 HTTP client。 | M2 | M2六操作/真实D/M1客户端 | 130测试及首轮保留卷/真实两级审批验收通过，分项已上传；最终SHA重建结果另见仓库外交付报告 | DONE | Phase 6 | 6 |
 | REQ-PH-007 | 实现 report、assign、start、finish、accept、cancel、review、escalate，并满足 §十四 rejectAcceptance 要求。 | M3 | M3十操作/升级任务 | 153后端与首轮原卷升级/真实工单验收通过；实际M1联动、完整UI留Phase8/9 | DONE | Phase 7 | 7 |
 | REQ-PH-008 | 连接 M2→M1、M3→M1，删除生产 mock；以真实审批占用及维修下架/验收恢复 E2E 验收。 | M2/M3/M1 | 跨模块集成 | 计划，未执行：两条真实跨模块流程 | TODO | Phase 8 | 8 |
-| REQ-PH-009 | 完成 student、approval、maintenance、admin 前端流程，主要业务无需 Postman。 | Web | apps/web | 计划，未执行：全角色 Web 人工验收 | TODO | Phase 9 | 9 |
+| REQ-PH-009 | 完成 student、approval、maintenance、admin 前端流程，主要业务无需 Postman。 | Web | apps/web | 成员三6路由实现及20路由核对清单已交付；完整公共入口和跨角色验收待二/四 | PARTIAL | Phase 9 | 9 |
 | REQ-PH-010 | 建 Testcontainers、Playwright、cross-service integration、scripts/test-all.sh；实际执行脚本退出 0。 | 测试 | 测试体系 | 计划，未执行：全量测试实际通过 | TODO | Phase 10 | 10 |
 | REQ-PH-011 | 创建 .github/workflows/ci.yml；lint/test/build 失败均不能合并。 | CI | CI | 计划，未执行：失败门禁验收 | TODO | Phase 11 | 11 |
 | REQ-PH-012 | 创建 deploy-test.yml；main merge→build→push→deploy→migration→health→smoke test。 | CD | 测试环境部署 | 计划，未执行：真实自动部署验收 | TODO | Phase 12 | 12 |
