@@ -36,7 +36,7 @@ class NonLocalDatabaseTest {
             assertThat(application.getBeansOfType(LocalDemoSeed.class)).isEmpty();
             var flyway = application.getBean(Flyway.class);
             flyway.validate();
-            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("4");
+            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("5");
             var jdbc = application.getBean(JdbcTemplate.class);
             for (String table : List.of("user", "user_role", "building", "room", "seat",
                     "user_room_scope", "room_checkin_code", "audit_log")) {

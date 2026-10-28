@@ -1,6 +1,13 @@
 #!/bin/sh
 set -eu
 cd "$(dirname "$0")/.."
+# Docker needs Linux container paths unchanged and Windows host paths for cp.
+docker_host_path() {
+    if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi
+}
+if command -v cygpath >/dev/null 2>&1; then
+    export MSYS_NO_PATHCONV=1
+fi
 revision=$(git rev-parse HEAD)
 if [ -n "$(git status --porcelain)" ]; then
     revision="${revision}-dirty"
@@ -33,11 +40,11 @@ test_container=$(docker create -i \
         done
         exec mvn -B -ntp clean verify "$@"
     ' campus-test "-DgitCommit=$revision" "-DbuildTime=$build_time" "$@")
-docker cp "$test_temporary/source.tar" "$test_container:/tmp/campus-source.tar"
+docker cp "$(docker_host_path "$test_temporary/source.tar")" "$test_container:/tmp/campus-source.tar"
 # Selected-module runs may need already packaged real upstream services for their HTTP fixtures.
 for module in platform reservation classroom maintenance; do
     test_jar="services/$module-service/target/$module-service-0.1.0-SNAPSHOT.jar"
-    if [ -f "$test_jar" ]; then docker cp "$test_jar" "$test_container:/tmp/existing-$module.jar"; fi
+    if [ -f "$test_jar" ]; then docker cp "$(docker_host_path "$test_jar")" "$test_container:/tmp/existing-$module.jar"; fi
 done
 set +e
 docker start -a "$test_container"
@@ -47,15 +54,15 @@ test_status=$(docker inspect --format '{{.State.ExitCode}}' "$test_container")
 for module in platform reservation classroom maintenance; do
     test_target="services/$module-service/target"
     mkdir -p "$test_target"
-    if docker cp "$test_container:/workspace/$test_target/surefire-reports" "$test_temporary/reports" 2>/dev/null; then
+    if docker cp "$test_container:/workspace/$test_target/surefire-reports" "$(docker_host_path "$test_temporary/reports")" 2>/dev/null; then
         rm -rf "$test_target/surefire-reports"
         mv "$test_temporary/reports" "$test_target/surefire-reports"
     fi
     docker cp "$test_container:/workspace/$test_target/$module-service-0.1.0-SNAPSHOT.jar" \
-        "$test_target/$module-service-0.1.0-SNAPSHOT.jar" 2>/dev/null || :
+        "$(docker_host_path "$test_target/$module-service-0.1.0-SNAPSHOT.jar")" 2>/dev/null || :
     mkdir -p "$test_target/site/jacoco"
     docker cp "$test_container:/workspace/$test_target/site/jacoco/jacoco.xml" \
-        "$test_target/site/jacoco/jacoco.xml" 2>/dev/null || :
+        "$(docker_host_path "$test_target/site/jacoco/jacoco.xml")" 2>/dev/null || :
 done
 if [ "$test_attach_status" -ne 0 ] && [ "$test_status" -eq 0 ]; then exit "$test_attach_status"; fi
 exit "$test_status"

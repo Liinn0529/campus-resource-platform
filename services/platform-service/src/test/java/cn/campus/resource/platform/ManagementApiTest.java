@@ -164,7 +164,7 @@ class ManagementApiTest extends ApiTestSupport {
                         .containsEntry("action", "ROLE_PERMISSIONS_REPLACED")
                         .containsEntry("requestId", updated.getBody().get("requestId"));
                 assertThat(row.keySet()).containsExactlyInAnyOrder("id", "actorUserId", "sourceService",
-                        "action", "targetType", "targetId", "requestId", "occurredAt");
+                        "sourceEventId", "action", "targetType", "targetId", "requestId", "occurredAt");
             });
             assertThatThrownBy(() -> jdbc.update("UPDATE platform.audit_log SET action = action WHERE false"))
                     .isInstanceOf(DataAccessException.class);

@@ -1,6 +1,6 @@
-# 平台 API 契约（Phase 6 草稿）
+# 平台 API 契约（Phase 8 成员二草案）
 
-本文件描述 D 公共层的实际代码方案，完整机器契约为 [OpenAPI 3 JSON](../../contracts/openapi/platform.v1.json)。Phase 3 交付基础能力，Phase 4 增加内部房间目录及座位筛选，Phase 5 增加真实 M1 提醒接收和本人站内收件箱；真实结果以阶段验证记录为准，静态契约不能代替运行验证或人工审阅。运行信息端点另见 [runtime.md](runtime.md)。本文共列 37个方法/路径组合。预约与实际签到由 M1 决定；M2审批与M3工单已由各自服务提供，通用远程审计写入仍留后续。
+本文件描述 D 公共层的实际代码方案和待审阅草案，机器契约为 [OpenAPI 3 JSON](../../contracts/openapi/platform.v1.json)。Phase 3 交付基础能力，Phase 4 增加内部房间目录及座位筛选，Phase 5 增加真实 M1 提醒接收和本人站内收件箱；真实结果以阶段验证记录为准，静态契约不能代替运行验证或人工审阅。运行信息端点另见 [runtime.md](runtime.md)。当前契约含 39 个方法/路径组合，其中两个 Phase 8 成员二接口仍是草案，须由非作者审核后冻结。预约与实际签到由 M1 决定；M2审批与M3工单由各自服务提供。
 
 ## 地址、认证与响应
 
@@ -16,8 +16,8 @@
 | 401 | 缺少/失效 JWT 或内部身份：UNAUTHORIZED；登录与当前密码错误：AUTHENTICATION_FAILED |
 | 403 | 权限、角色或房间范围不符：FORBIDDEN |
 | 404 | USER_NOT_FOUND、ROLE_NOT_FOUND、BUILDING_NOT_FOUND、ROOM_NOT_FOUND、SEAT_NOT_FOUND、CHECKIN_CODE_NOT_FOUND、NOT_FOUND |
-| 409 | 唯一键等 DATA_CONFLICT、LAST_SYSTEM_ADMIN、SYSTEM_ADMIN_PERMISSIONS_FIXED、IDENTITY_CHANGED；NOTIFICATION_SOURCE_CONFLICT |
-| 422 | 未知角色/权限/房间引用或不符合管理规则：INVALID_REFERENCE_OR_VALUE；通知为 NOTIFICATION_RECIPIENT_UNAVAILABLE / NOTIFICATION_INVALID_WINDOW |
+| 409 | 唯一键等 DATA_CONFLICT、LAST_SYSTEM_ADMIN、SYSTEM_ADMIN_PERMISSIONS_FIXED、IDENTITY_CHANGED；NOTIFICATION_SOURCE_CONFLICT、AUDIT_EVENT_SOURCE_CONFLICT |
+| 422 | 未知角色/权限/房间引用或不符合管理规则：INVALID_REFERENCE_OR_VALUE；通知为 NOTIFICATION_RECIPIENT_UNAVAILABLE / NOTIFICATION_INVALID_WINDOW；审计为 AUDIT_EVENT_NOT_ALLOWED |
 | 500 / 503 | 不返回异常详情：INTERNAL_ERROR / DATABASE_UNAVAILABLE |
 
 带分页的列表支持 limit 1–100、offset ≥0；用户/审计/通知默认 limit=50，空间默认 100。排序及过滤见下面各组与 OpenAPI。输入中的密码为写入字段，不得放在 URL、查询字符串或日志中。新设密码必须非空白且为 12–72 个 UTF-8 字节，使用 BCrypt cost 12；登录密码最多 72 字节。
@@ -83,7 +83,7 @@ Building 为 id/code/name；Room 另含 buildingId/type/enabled；Seat 为 id/ro
 
 本阶段没有硬删除。启停和移动主数据尚未与未来预约/占用协调；相关业务政策必须在 M1 与跨模块阶段继续定义，不能把 D 的 enabled 当作预约真值。
 
-## 参数、签到码与审计（5 个公开操作）
+## 参数、签到码与审计（6 个公开操作）
 
 | 方法与路径 | 请求 / 行为 | 权限 |
 |---|---|---|
@@ -92,12 +92,13 @@ Building 为 id/code/name；Room 另含 buildingId/type/enabled；Seat 为 id/ro
 | GET /api/v1/rooms/{id}/checkin-code | 只读今日已有 `{roomId,date,code}`；未创建返回 404 | checkin-code:manage + 房间范围 |
 | POST /api/v1/rooms/{id}/checkin-code | 确保今日记录存在后返回同样对象；首次和重复均为 200 | checkin-code:manage + 房间范围 |
 | GET /api/v1/audit-events | AuditEvent 数组，按 id 降序分页，可用 targetType 过滤 | SYSTEM_ADMIN + audit:view |
+| GET /api/v1/maintenance-staff | 当前可派维修人员 `{id,displayName}` 列表，按 id 升序分页 | PROPERTY_MANAGER + maintenance:assign |
 
 最大连续预约时长存为正整数，D 维护和提供该值；M1 每次新建/再预约读取当前快照，既有预约不随参数改写，详见[预约契约](reservation.md)。
 
 签到码日期由注入 Clock 和显式 `CAMPUS_BUSINESS_ZONE` 计算，本地为 Asia/Shanghai；客户端不能提交任意日期。每日每房间一条记录，由 `(room_id,date)` 主键保护。代码为 SecureRandom 生成的 8 位 `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` 字符，不含 I/O/0/1，不要求跨房间全局唯一。重复或并发 ensure 返回同一条记录且只产生一条创建审计。不提供同日轮换或 QR 载荷；预约资格与实际签到由 M1 的真实 HTTP 调用及房间锁事务决定。停用房间不能生成/读取有效码；学生不能取码。验证码和令牌均不得写入日志或审计。
 
-D 修改与审计同事务。AuditEvent 包含 id、actorUserId、sourceService、action、targetType、targetId、requestId、occurredAt，没有输入正文、密码、JWT 或签到码。targetType 过滤为 `[A-Z_]{1,32}`；审计应用身份不可 UPDATE/DELETE，查询由权限控制。审计保存期限仍未定，当前不提供清理或导出机制。
+D 修改与审计同事务。AuditEvent 包含 id、actorUserId、sourceService、sourceEventId（D本地事件为null）、action、targetType、targetId、requestId、occurredAt，没有输入正文、密码、JWT 或签到码。targetType 过滤为 `[A-Z_]{1,32}`；审计应用身份不可 UPDATE/DELETE，查询由权限控制。审计保存期限仍未定，当前不提供清理或导出机制。
 
 ## 私网内部接口（6 个操作）
 
@@ -152,3 +153,13 @@ M1 持久队列使用相同 sourceRefId 处理超时后回执未知和进程恢�
 ## Phase7维修人员资格
 
 `GET /internal/v1/maintenance-staff/{id}`仅maintenance-service专属凭据可调用；其他有效服务403，用户JWT/无效凭据401，非法ID400。200 envelope的data仅含id与eligible；当前enabled且PROPERTY_STAFF才true，不存在、停用或失去角色均false，不返回姓名/密码/权限。M3派单时真实调用此接口；不共享D表，不扩seed。
+
+## Phase8成员二接口草案（待成员四和服务负责人review）
+
+`GET /api/v1/maintenance-staff` 仅当前同时具有 `PROPERTY_MANAGER` 角色及 `maintenance:assign` 权限的用户可读。支持 `limit`（默认50，1–100）与 `offset`（默认0，非负），按用户ID升序分页；只返回当前 enabled 且拥有 `PROPERTY_STAFF` 角色的 `{id,displayName}`。不返回用户名、联系方式、角色详情或凭据。M3浏览器页面使用当前用户JWT，不持有M3内部服务密钥。
+
+`POST /internal/v1/audit-events` 通过M1/M2/M3各自现有的独立服务凭据鉴别来源，D要求认证服务身份与 `sourceModule` 一致。载荷只含 `sourceModule`、稳定 `sourceEventId`、白名单 `action`、白名单 `entityType`、`entityId`、可空 `actorUserId`、`occurredAt` 和 `sourceRequestId`；不收正文或个人详情。生产者必须从其真实用户认证上下文写入actor，系统事件为null，D信任该已认证生产者并校验 actor 外键，不跨schema核查业务表。
+
+来源动作草案：M1 `RESERVATION` 允许 `CREATED/REBOOKED/CANCELLED/CHECKED_IN/NO_SHOW`；M2 `CLASSROOM_REQUEST` 允许 `SUBMITTED/REJECTED/FIRST_APPROVED/FINAL_APPROVED/CANCELLED/AUTO_CANCELLED/SYNC_FAILED/SYNC_ATTEMPTED/OCCUPANCY_CONFIRMED/SYNC_RETRY_SCHEDULED`；M3 `MAINTENANCE_TICKET` 允许 `REPORTED/ASSIGNED/START_REQUESTED/FINISHED/ACCEPT_REQUESTED/ACCEPTANCE_REJECTED/CANCELLED/REVIEWED/ESCALATED/SYNC_FAILED/SYNC_ATTEMPTED/OCCUPANCY_CONFIRMED/RELEASE_CONFIRMED/SYNC_RETRY_SCHEDULED`。动作枚举须由各模块负责人核对并由成员四复核，不代表生产者已实现投递。
+
+新 `(source_service,sourceEventId)` 返回201与 `id/status=ACCEPTED`；相同键、相同载荷重放返回200及原ID；相同键载荷不一致返回409 `AUDIT_EVENT_SOURCE_CONFLICT`；来源身份不匹配403，动作/目标不在白名单422 `AUDIT_EVENT_NOT_ALLOWED`。重放比较把 `occurredAt` 转为 Instant 后截断到微秒，与 PostgreSQL 时间精度一致；落入同一微秒的亚微秒差异按相同载荷处理。此时间等价规则是待负责人和成员四确认的契约提案。插入和去重由D事务及唯一约束裁决，业务事件与投递队列仍由各生产者在自己的schema内原子保存并负责重试；D接收成功才表示审计已持久化，不表示业务事件生产者已确认投递。字段、白名单和actor可信边界均待人工评审。
