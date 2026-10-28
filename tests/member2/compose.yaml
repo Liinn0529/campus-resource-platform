@@ -1,0 +1,79 @@
+name: campus-member-02-acceptance
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: campus_resource
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      PLATFORM_DB_PASSWORD: ${PLATFORM_DB_PASSWORD:?}
+      PLATFORM_FLYWAY_PASSWORD: ${PLATFORM_FLYWAY_PASSWORD:?}
+      RESERVATION_DB_PASSWORD: ${RESERVATION_DB_PASSWORD:?}
+      RESERVATION_FLYWAY_PASSWORD: ${RESERVATION_FLYWAY_PASSWORD:?}
+      CLASSROOM_DB_PASSWORD: ${CLASSROOM_DB_PASSWORD:?}
+      CLASSROOM_FLYWAY_PASSWORD: ${CLASSROOM_FLYWAY_PASSWORD:?}
+      MAINTENANCE_DB_PASSWORD: ${MAINTENANCE_DB_PASSWORD:?}
+      MAINTENANCE_FLYWAY_PASSWORD: ${MAINTENANCE_FLYWAY_PASSWORD:?}
+    tmpfs: [/var/lib/postgresql/data]
+    volumes:
+      - ./deploy/postgres/010-service-databases.sh:/docker-entrypoint-initdb.d/010-service-databases.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U postgres -d campus_resource']
+      interval: 2s
+      retries: 30
+  platform-service:
+    image: eclipse-temurin:21-jre-alpine
+    ports: ['127.0.0.1:18082:8080']
+    command: [java, -jar, /app.jar]
+    mem_limit: 512m
+    volumes:
+      - ./services/platform-service/target/platform-service-0.1.0-SNAPSHOT.jar:/app.jar:ro
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/campus_resource?currentSchema=platform
+      DB_USERNAME: platform_app
+      DB_PASSWORD: ${PLATFORM_DB_PASSWORD:?}
+      FLYWAY_USERNAME: platform_migrator
+      FLYWAY_PASSWORD: ${PLATFORM_FLYWAY_PASSWORD:?}
+      SPRING_PROFILES_ACTIVE: local
+      CAMPUS_SEED_PASSWORD: ${DEV_SEED_PASSWORD:?}
+      PLATFORM_JWT_SECRET: ${PLATFORM_JWT_SECRET:?}
+      PLATFORM_RESERVATION_TOKEN: ${PLATFORM_RESERVATION_TOKEN:?}
+      PLATFORM_CLASSROOM_TOKEN: ${PLATFORM_CLASSROOM_TOKEN:?}
+      PLATFORM_MAINTENANCE_TOKEN: ${PLATFORM_MAINTENANCE_TOKEN:?}
+      CAMPUS_BUSINESS_ZONE: Asia/Shanghai
+      CAMPUS_CORS_ORIGINS: http://127.0.0.1:5174
+    depends_on:
+      postgres: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, 'http://127.0.0.1:8080/actuator/health']
+      interval: 3s
+      retries: 40
+  reservation-service:
+    image: eclipse-temurin:21-jre-alpine
+    command: [java, -jar, /app.jar]
+    mem_limit: 512m
+    volumes:
+      - ./services/reservation-service/target/reservation-service-0.1.0-SNAPSHOT.jar:/app.jar:ro
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/campus_resource?currentSchema=reservation
+      DB_USERNAME: reservation_app
+      DB_PASSWORD: ${RESERVATION_DB_PASSWORD:?}
+      FLYWAY_USERNAME: reservation_migrator
+      FLYWAY_PASSWORD: ${RESERVATION_FLYWAY_PASSWORD:?}
+      PLATFORM_BASE_URL: http://platform-service:8080
+      PLATFORM_RESERVATION_TOKEN: ${PLATFORM_RESERVATION_TOKEN:?}
+      CAMPUS_BUSINESS_ZONE: Asia/Shanghai
+      CAMPUS_CORS_ORIGINS: http://127.0.0.1:5174
+    depends_on:
+      platform-service: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, 'http://127.0.0.1:8080/actuator/health']
+      interval: 3s
+      retries: 40
+  gateway:
+    image: nginx:stable-alpine
+    ports: ['127.0.0.1:18081:8080']
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      reservation-service: {condition: service_healthy}

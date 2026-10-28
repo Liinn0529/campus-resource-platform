@@ -46,7 +46,7 @@ OQ-01..15全部保留。Phase 5对签到窗口、NO_SHOW、站内入箱/恢复�
 |---|---|---|---|---|---|---|---|
 | REQ-ARCH-001 | 使用 Monorepo、前后端分离、四个后端服务、REST API 和 PostgreSQL；清晰区分 D、M1、M2、M3。 | D/M1/M2/M3 | 四服务及 apps/web; D/M1 公开/内部 API | D 33/M1 8 操作及真实 HTTP/PostgreSQL 已实现并测试；M2/M3 业务仍留对应阶段 | PARTIAL | §一、四、五 | 0 设计; 1 实现 |
 | REQ-ARCH-002 | 后端采用 Java 21、Spring Boot 3.x、Spring Security、MyBatis、PostgreSQL、Flyway、Maven、Bean Validation、OpenAPI 3、JUnit 5、Testcontainers、JaCoCo。 | 全局 | 后端依赖/构建; D/M1 OpenAPI JSON | Java 21/Maven/Boot/Security/MyBatis/PostgreSQL/Flyway/JUnit/Testcontainers/JaCoCo 构建与75项测试通过；D33/M1 8操作契约正式校验通过 | DONE | §三 | 1 起 |
-| REQ-ARCH-003 | 前端采用 Vue 3、TypeScript、Vite、Vue Router、Pinia、Element Plus、Axios、Vitest、Playwright。 | Web | apps/web | 已执行：Vue 栈、6 tests/lint/build；业务 Playwright 待 Phase 10 | PARTIAL | §三 | 1 起 |
+| REQ-ARCH-003 | 前端采用 Vue 3、TypeScript、Vite、Vue Router、Pinia、Element Plus、Axios、Vitest、Playwright。 | Web | apps/web | 已执行：Vue 栈、6 Vitest tests、lint/typecheck/build；Playwright 真实本地浏览器 3 项通过；完整 Phase10 集成/CI仍待后续 | PARTIAL | §三 | 1 起 |
 | REQ-ARCH-004 | 运维采用 Docker、Docker Compose、Nginx、GitHub Actions、华为云 SWR/ECS/RDS PostgreSQL。 | 运维 | deploy; .github/workflows | 已执行：Docker/Compose/Nginx 真实运行；Actions/华为云待后续 | PARTIAL | §三 | 1/11–14 |
 | REQ-ARCH-005 | 遵循附录 A 的目标目录；Phase 0 只建文档与空目录，pom.xml、package.json、pnpm-workspace.yaml 等工程文件留后续。 | 全局 | 仓库目录 | 已执行：本阶段构建/应用/脚本文件；后续目录仍保留占位 | PARTIAL | §四 | 0 目录; 1 起文件 |
 | REQ-ARCH-006 | 跨模块只能通过 HTTP API；业务服务通过 D 获取其拥有的身份、权限和空间主数据；M2/M3 通过 M1 创建及释放房间占用。 | D/M1/M2/M3 | M1/M2/M3 PlatformClient; D /me/room-scopes/内部资格读取 | 三服务真实HTTP读取D身份/资源，M2范围/M3资格与真实M1拒绝通过；M1实际占用/释放仍待Phase8，无跨schema | PARTIAL | §一、五、六 | 0 设计; 3–8 实现 |
@@ -84,7 +84,7 @@ OQ-01..15全部保留。Phase 5对签到窗口、NO_SHOW、站内入箱/恢复�
 | REQ-D-004 | 管理系统参数，含最大连续预约时长；M1 通过约定 API 使用参数。 | D/M1 | D settings API; M1 PlatformClient.settings/TimeRules | 真实 D 默认4、HTTP修改当前参数为2后M1新建按新快照拒绝超长，已有预约不改写；测试通过，具体政策待审 | DONE | §五.1、十一; Phase 3 | 3/4 |
 | REQ-D-005 | 每房间每天生成 6–8 位随机字符签到码；提供校验所需能力，可生成 QR Code。 | D | GET/POST /api/v1/rooms/{id}/checkin-code; internal verify | 已执行：每日 8 位随机码、room/date 唯一、Clock 上海日界、并发同条/单审计及 M1-only 校验测试通过；不含实际签到，QR 可选未实现 | DONE | §五.1、十二; Phase 3 | 3 |
 | REQ-D-006 | 提供通知接口，供 M1 提醒调用；实际渠道、投递状态和去重策略待确认，不用假通知宣称送达。 | D/M1 | D POST/internal/v1/notifications; GET/api/v1/notifications; M1 reminder | 真实D站内接收/本人读取、来源幂等冲突、未知回执重放/有限尝试测试通过；仅持久入箱，不称邮件/已读 | DONE | §五.1、十一 | 3 契约; 5 实现 |
-| REQ-D-007 | 提供操作审计，支持授权查询；业务事件与公共审计之间通过 HTTP 契约关联。 | D | AuditService/Mapper; GET /api/v1/audit-events | D 修改/审计同事务、授权查询、requestId 关联和 app UPDATE/DELETE 拒绝测试已通过；跨服务事件与公共审计的 HTTP 关联仍留后续 | PARTIAL | §五.1; Phase 3 | 3 |
+| REQ-D-007 | 提供操作审计，支持授权查询；业务事件与公共审计之间通过 HTTP 契约关联。 | D | AuditService/Mapper; GET /api/v1/audit-events; POST /internal/v1/audit-events | 当前D接收端真实HTTP/PostgreSQL测试及V5迁移通过；来源身份、动作白名单、原子去重/冲突、授权查询通过；独立tmpfs环境实测D重启、数据库暂不可达后未知结果重放、无效actor纠正后重投三项恢复通过。其他成员生产者/outbox、非作者契约复核仍待 | PARTIAL | §五.1; Phase 3/8 | 3/8 |
 | REQ-D-008 | 每个服务都提供 health 与 version/info；D 的职责列表不替代其他服务自身端点。 | D/M1/M2/M3 | GET /actuator/health; GET /actuator/info | 已执行：四服务真实 HTTP 测试，见 phase-1-backend.md | DONE | §五.1、二十八 | 1 |
 
 ## M1 自习座位预约
@@ -103,7 +103,7 @@ OQ-01..15全部保留。Phase 5对签到窗口、NO_SHOW、站内入箱/恢复�
 | REQ-M1-010 | 以预约开始时间 T 为基准：T−15min 第一次提醒、T+10min 第二次提醒、T+15min 未签到判 NO_SHOW。 | M1/D | LifecycleService/Scheduler; reminder; D notification | T−15/T+10提醒与T+15 NO_SHOW真实HTTP/PostgreSQL+注入Clock验证，独立30秒任务和持久去重恢复通过 | DONE | §十一; Phase 5 | 5 |
 | REQ-M1-011 | NO_SHOW 处置需结束预约有效性、释放 occupancy、新增 violation、新增 audit/event；最终持久状态与“取消预约”表述歧义见 OQ-01。 | M1 | LifecycleService; violation; 系统事件 | NO_SHOW/精确来源释放/唯一违约/actor=null系统事件同事务，重复/并发与异常回滚验证通过 | DONE | §十一; Phase 5 | 5 |
 | REQ-M1-012 | 所有相关时间逻辑使用可注入 Clock，测试不得依赖真实等待或系统当前时间。 | M1 | TimeRules/ReservationService/LifecycleService; Clock | 基础预约及签到/提醒/截止/锁等待均使用注入Clock，真实HTTP测试无需等待15分钟 | DONE | §十一; Phase 5 | 5 |
-| REQ-M1-013 | Web 输入签到码后校验 room、reservation 再完成签到；签到结果由后端确定。 | M1/D | POST/api/v1/reservations/{id}/checkin; D verify | 本人窗口/房间码/预约验证及幂等后端已实现，真实D/HTTP与并发/窗口验证通过；完整Web输入及E2E留Phase9/10 | PARTIAL | §十二; Phase 5 | 5 |
+| REQ-M1-013 | Web 输入签到码后校验 room、reservation 再完成签到；签到结果由后端确定。 | M1/D | POST/api/v1/reservations/{id}/checkin; D verify | 2026-10-28 18:45真实签到窗口：D生成当日码，浏览器提交本人预约签到成功，刷新仍为CHECKED_IN；提前签到409及后端本人/房间/时间验证通过。无时钟修改或假成功；非作者最终复核仍待 | PARTIAL | §十二; Phase 5/9 | 5/9 |
 | REQ-M1-014 | 第一版签到不使用 GPS、人脸识别、蓝牙、NFC。 | M1/Web | CheckinInput; D verify; 依赖/采集范围 | 仅房间码和本人预约输入；实现/依赖与真实HTTP验证无GPS、人脸、蓝牙或NFC采集 | DONE | §十二 | 5 |
 | REQ-M1-015 | M1 作为座位占用账本唯一所有者，提供 M2 教室占用、M3 维修占用及释放能力，并保留来源。 | M1 | seat_occupancy; ReservationMapper conflict query | M1拥有账本，三来源/null seat冲突读模型真实PG测试通过；M2/M3创建/释放HTTP留Phase8 | PARTIAL | §七、八、九; Phase 8 | 4 基础; 8 集成 |
 | REQ-M1-016 | M2 创建/释放教室占用、M3 创建/释放维修占用均由 M1 在 room_gate 同房间锁事务内执行。 | M1/M2/M3 | room-blocks API | 计划，未执行：与 M1 预约并发的互斥验证 | TODO | §八 | 8 |
@@ -160,11 +160,11 @@ OQ-01..15全部保留。Phase 5对签到窗口、NO_SHOW、站内入箱/恢复�
 |---|---|---|---|---|---|---|---|
 | REQ-SEC-001 | 密码使用 BCrypt 存储和校验，不保存明文或可逆密码。 | D | AuthenticationService; ManagementService; LocalDemoSeed | 已执行：BCrypt(12) seed/登录/自助改密/管理员重置、UTF-8 边界和错误密码/旧凭据失效测试通过；响应无明文或哈希 | DONE | §十六、二十九 | 3 |
 | REQ-SEC-002 | JWT 必须验证且有 expiration；失效、过期或篡改凭证不能认证。 | D/全服务 | PlatformSecurity; JwtEncoder/Decoder; authVersion | 已执行：D 固定 HS256/issuer/audience、必需时间及严格 exp、签名/authVersion/DB 启用校验；正常/篡改/过期/边界失效测试通过 | DONE | §十六、二十九 | 3 |
-| REQ-SEC-003 | 权限必须后端校验，前端隐藏按钮不能作为权限控制；角色与个人数据范围隔离。 | 全服务/Web | D/M1 AccessPolicy; M1 RemoteAuthenticationFilter | D即时权限/房间范围及M1真实D即时撤权/停用、本人范围、spoof userId拒绝通过；未来模块/Web持续补齐 | PARTIAL | §十五、二十九 | 3 起 |
+| REQ-SEC-003 | 权限必须后端校验，前端隐藏按钮不能作为权限控制；角色与个人数据范围隔离。 | 全服务/Web | D/M1 AccessPolicy; M1 RemoteAuthenticationFilter | D/M1真实后端权限/房间范围、撤权/停用旧JWT及本人范围测试通过；浏览器学生管理路由拒绝、错误密码、无效会话清理通过；其他模块/非作者复核仍待 | PARTIAL | §十五、二十九 | 3 起 |
 | REQ-SEC-004 | RBAC 保留附录 C 的角色和权限示例；角色到权限及组织/房间范围映射须在实现前确认。 | D | V3 七角色/14 权限参考目录; role/room-scope API | 七角色/14 权限目录、SYSTEM_ADMIN 全局与 ROOM_ADMIN 显式范围测试通过；具体映射/组织范围仍待人工 review | PARTIAL | §十五 | 3 |
 | REQ-SEC-005 | 生产只通过 HTTPS 暴露业务流量。 | 运维 | Nginx / 公网入口 | 计划，未执行：HTTP 暴露面与 HTTPS 访问检查 | TODO | §十六、二十九 | 13/14 |
 | REQ-SEC-006 | SQL 参数化，禁止把不可信输入拼接为 SQL。 | 全服务 | D/M1 MyBatis Mapper; seed参数绑定 | D/M1 Mapper与seed使用绑定参数，真实HTTP/数据库边界测试通过；后续模块继续审查 | PARTIAL | §二十九 | 3 起 |
-| REQ-SEC-007 | CORS 使用明确白名单，避免任意来源访问。 | 全服务 | D/M1 明确CORS origins | D/M1明确白名单；M1实际本地预检200且匹配ACAO，未知来源403且无ACAO；其他模块/生产持续维护 | PARTIAL | §二十九 | 1 配置; 3 起验证 |
+| REQ-SEC-007 | CORS 使用明确白名单，避免任意来源访问。 | 全服务 | D/M1 明确CORS origins | D/M1明确白名单；既有M1预检验证通过；2026-10-28隔离D实际预检未知来源403且无ACAO。共享客户端拒绝任意外部地址与替换baseURL后携带JWT；其他模块/生产及独立复核仍待 | PARTIAL | §二十九 | 1 配置; 3 起验证 |
 | REQ-SEC-008 | Git 不包含 token、密码或密钥；部署脚本不得硬编码凭据。 | 全局 | 私有 .env; init-env; Compose 运行注入 | JWT/数据库/内部调用秘密从私有环境提供，测试仅隔离凭据；本次提交敏感值检查与后续部署持续验证 | PARTIAL | §二、二十九、三十五 | 0–15 |
 | REQ-SEC-009 | 生产不得保留默认密码，初始管理员凭据必须外部提供并明确运维流程。 | 运维/D | 生产用户初始化 | 计划，未执行：无默认凭据验证 | TODO | §二十九 | 13/14 |
 | REQ-SEC-010 | 数据库只在私网可达，不向公网开放。 | 数据库/运维 | RDS / 网络规则 | 计划，未执行：公网拒绝及应用私网连接验证 | TODO | §二十九 | 13/14 |
@@ -189,14 +189,14 @@ OQ-01..15全部保留。Phase 5对签到窗口、NO_SHOW、站内入箱/恢复�
 
 | ID | Requirement | Module | API/Page | Test | Status | Source | Phase |
 |---|---|---|---|---|---|---|---|
-| REQ-UI-001 | 提供 /login 与 /student/home，以真实身份和业务数据呈现入口。 | Web/D | /login; /student/home | 计划，未执行：登录与学生首页 E2E | TODO | §二十 | 9 |
-| REQ-UI-002 | 提供自习室列表、详情、预约列表、详情及历史五类页面，完整保留附录 E 路由。 | Web/M1 | /student/rooms; /student/rooms/:id; /student/reservations; /student/reservations/:id; /student/history | 计划，未执行：搜索、预约、取消、签到、历史与再预约 E2E | TODO | §二十 | 9 |
-| REQ-UI-003 | 提供学生整教室申请及报修页面。 | Web/M2/M3 | /student/classroom-applications; /student/repairs | 计划，未执行：提交、查询及可用操作 E2E | TODO | §二十 | 9 |
-| REQ-UI-004 | 提供审批列表和审批详情。 | Web/M2 | /approvals; /approvals/:id | 计划，未执行：各级审批、驳回及权限 E2E | TODO | §二十 | 9 |
-| REQ-UI-005 | 提供维修工单列表和详情。 | Web/M3 | /maintenance; /maintenance/:id | 计划，未执行：派单、维修、验收、评价及超时标记 E2E | TODO | §二十 | 9 |
-| REQ-UI-006 | 提供空间、房间、座位、用户、角色、设置、审计七个管理页面。 | Web/D | /admin/spaces; /admin/rooms; /admin/seats; /admin/users; /admin/roles; /admin/settings; /admin/audit | 计划，未执行：管理流程及学生访问拒绝 E2E | TODO | §二十 | 9 |
-| REQ-UI-007 | UI 清晰、克制、业务化、响应式；学生端 Mobile friendly，管理端 Desktop first。 | Web | 全部页面 | 计划，未执行：手机及桌面尺寸人工验收 | TODO | §二十一 | 9 |
-| REQ-UI-008 | 避免大量渐变、无意义动画、AI 风格装饰、Fake Dashboard、无真实来源图表。 | Web | 全部页面 | 计划，未执行：视觉与数据来源审查 | TODO | §二十一 | 9 |
+| REQ-UI-001 | 提供 /login 与 /student/home，以真实身份和业务数据呈现入口。 | Web/D | /login; /student/home | Playwright真实本地账号登录、身份/本人数据首页通过；修复Pinia认证判断的非响应式令牌依赖；非作者走查仍待 | PARTIAL | §二十 | 9 |
+| REQ-UI-002 | 提供自习室列表、详情、预约列表、详情及历史五类页面，完整保留附录 E 路由。 | Web/M1 | /student/rooms; /student/rooms/:id; /student/reservations; /student/reservations/:id; /student/history | 真实浏览器预约/取消/详情刷新/再预约、两个空时间输入、51条真实历史分页、101座位全量查询与筛选、旧响应不覆盖新视图、真实409及断网恢复通过；签到结果见REQ-M1-013，非作者最终复核仍待 | PARTIAL | §二十 | 9 |
+| REQ-UI-003 | 提供学生整教室申请及报修页面。 | Web/M2/M3 | /student/classroom-applications; /student/repairs | 成员三的六页片段已集成到公共 router、Pinia/Axios context 和 Element Plus；真实M2/M3提交、查询、取消/评价 E2E 未执行 | TODO | §二十 | 9 |
+| REQ-UI-004 | 提供审批列表和审批详情。 | Web/M2 | /approvals; /approvals/:id | 审批页面与角色+权限入口守卫已集成；共享路由守卫单测来自成员三并纳入工程，当前工作树未运行；真实角色范围、审批、驳回和刷新 E2E 未执行 | TODO | §二十 | 9 |
+| REQ-UI-005 | 提供维修工单列表和详情。 | Web/M3 | /maintenance; /maintenance/:id | 维修页面与物业员工/主管入口守卫已集成；真实派单、维修、验收、评价、超时和报修人详情授权 E2E 未执行 | TODO | §二十 | 9 |
+| REQ-UI-006 | 提供空间、房间、座位、用户、角色、设置、审计七个管理页面。 | Web/D | /admin/spaces; /admin/rooms; /admin/seats; /admin/users; /admin/roles; /admin/settings; /admin/audit | 七管理页真实读取及楼宇/房间/座位创建修改、资源启停、用户启停/密码重置、角色/范围授权、权限修改恢复、参数保存恢复、审计过滤通过；非作者复核仍待 | PARTIAL | §二十 | 9 |
+| REQ-UI-007 | UI 清晰、克制、业务化、响应式；学生端 Mobile friendly，管理端 Desktop first。 | Web | 全部页面 | 14条本人路由已保存截图：学生375px无溢出且导航独立横排，管理1440px；回车登录、直达/刷新、参数恢复/退出通过。审批维修完整视觉/键盘验收及非作者复核属后续依赖 | PARTIAL | §二十一 | 9 |
+| REQ-UI-008 | 避免大量渐变、无意义动画、AI 风格装饰、Fake Dashboard、无真实来源图表。 | Web | 全部页面 | 当前页面使用真实API与空态，无虚构统计图表；全页视觉/数据来源仍待成员三及成员四复核 | PARTIAL | §二十一 | 9 |
 | REQ-UI-009 | 学生、审批、维修、管理主要业务通过 Web 完成，无需 Postman。 | Web/全服务 | 全角色业务页面 | 计划，未执行：真实账号端到端人工验收 | TODO | Phase 9 | 9 |
 
 ## 测试层次与有效性
@@ -209,7 +209,7 @@ OQ-01..15全部保留。Phase 5对签到窗口、NO_SHOW、站内入箱/恢复�
 | REQ-TEST-004 | 集成测试覆盖并发预约、room_gate lock 和占用互斥，确认冲突不会生成双重预约。 | M1 | ReservationWorkflowTest 首次六请求并发 | 实际PostgreSQL房间锁；首次同座位六竞争仅一201/五409，仅一预约及占用；不同座位均可成功 | DONE | §二十五 | 4/10 |
 | REQ-TEST-005 | 集成测试通过真实 HTTP 覆盖 M2→M1、M3→M1 和 idempotency，不以生产 mock 替代。 | M2/M3/M1 | 跨服务集成测试 | 计划，未执行：成功、重复、冲突和失败结果 | TODO | §二十五 | 8/10 |
 | REQ-TEST-006 | API 测试覆盖 401、403、正常请求、409、非法参数和角色隔离。 | 全服务 | D/M1真实HTTP/PostgreSQL测试 | D与M1的401/403/正常/409/非法参数/角色及本人隔离通过；其他模块继续补齐 | PARTIAL | §二十五 | 3–10 |
-| REQ-TEST-007 | Playwright E2E 覆盖学生登录 → 搜索 → 预约，以及签到。 | Web/M1/D | 学生页面 | 计划，未执行：真实后端 Playwright 报告 | TODO | §二十五 | 9/10 |
+| REQ-TEST-007 | Playwright E2E 覆盖学生登录 → 搜索 → 预约，以及签到。 | Web/M1/D | apps/web/e2e/student-reservation.spec.ts | 本人真实浏览器普通回归4/4；隔离专项6类用例分别通过，包含登录/搜索/预约/取消/历史/再预约、成功签到并刷新确认、管理写操作和异常边界。签到用例真实等待26分钟；其他成员跨服务全套E2E及独立复验仍待 | PARTIAL | §二十五 | 9/10 |
 | REQ-TEST-008 | Playwright E2E 覆盖整教室申请 → 审批 → M1 座位不可约。 | Web/M2/M1 | 申请/审批/座位页面 | 计划，未执行：真实跨模块 Playwright 报告 | TODO | §二十五 | 9/10 |
 | REQ-TEST-009 | Playwright E2E 覆盖报修 → 开始维修 → M1 下架，以及验收 → 座位恢复。 | Web/M3/M1 | 报修/维修/座位页面 | 计划，未执行：真实跨模块 Playwright 报告 | TODO | §二十五 | 9/10 |
 | REQ-TEST-010 | 至少一次 mutation-style 人工验证：临时破坏业务规则，确认测试失败，恢复代码并重新验证。 | 全局 | 实际变异验证 | 计划，未执行：变异失败与恢复通过的真实输出 | TODO | §二十六 | 10 |
@@ -284,7 +284,7 @@ OQ-01..15全部保留。Phase 5对签到窗口、NO_SHOW、站内入箱/恢复�
 ## 基线统计与更新规则
 
 - 需求总数：186。
-- 当前状态：DONE 66；TODO 78；PARTIAL 42；BLOCKED 0。
+- 当前状态：DONE 66；TODO 72；PARTIAL 48；BLOCKED 0。
 - 分类计数：REQ-P0: 8, REQ-GOV: 12, REQ-ARCH: 12, REQ-DATA: 12, REQ-D: 8, REQ-M1: 17, REQ-M2: 10, REQ-M3: 12, REQ-API: 8, REQ-SEC: 12, REQ-ENG: 9, REQ-UI: 9, REQ-TEST: 12, REQ-OPS: 16, REQ-AGENT: 7, REQ-ETH: 7, REQ-PH: 15。
 - API/Page 和 Test 的计划内容须在对应阶段替换/补充为真实契约、代码/测试路径和执行证据；保留源要求与稳定 ID。
 - 标记 DONE 前，检查源 §三十九 DoD 和本阶段适用范围，更新实际验收记录；不得把计划测试名称、文档审阅或工具退出码冒充业务测试通过。
