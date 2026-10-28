@@ -13,8 +13,21 @@ import org.springframework.scheduling.annotation.Scheduled;
 class LifecycleScheduler {
     private static final Logger LOG = LoggerFactory.getLogger(LifecycleScheduler.class);
     private final LifecycleService lifecycle;
+    private final AuditDeliveryService audit;
+    private final boolean auditEnabled;
 
-    LifecycleScheduler(LifecycleService lifecycle) { this.lifecycle = lifecycle; }
+    LifecycleScheduler(LifecycleService lifecycle, AuditDeliveryService audit,
+            @org.springframework.beans.factory.annotation.Value("${campus.reservation.audit-dispatch-enabled:false}") boolean auditEnabled) {
+        this.lifecycle = lifecycle; this.audit = audit; this.auditEnabled = auditEnabled;
+    }
+
+    @Scheduled(fixedDelayString = "${campus.reservation.scan-delay-ms:30000}",
+            initialDelayString = "${campus.reservation.scan-delay-ms:30000}")
+    void audit() {
+        if (!auditEnabled) { return; }
+        try { audit.dispatchDue(); }
+        catch (RuntimeException failure) { LOG.error("Reservation audit dispatch failed type={}", failure.getClass().getSimpleName()); }
+    }
 
     @Scheduled(fixedDelayString = "${campus.reservation.scan-delay-ms:30000}",
             initialDelayString = "${campus.reservation.scan-delay-ms:30000}")

@@ -1,4 +1,17 @@
-# M1 预约、签到与违约 API（Phase 5 草稿）
+# M1 预约、签到、违约与内部占用 API（成员一 Phase8 草稿）
+
+成员一新增两个内部操作，OpenAPI现为12操作。以下原有公开API语义保留；正常完成与审计投递的新实现和默认关闭条件见[成员一实施说明](../plans/member-01-phase8.md)。历史“未实现”描述如与本段冲突，以本段及成员一验收记录为准，不能将本分支理解为全组Phase8已验收。
+
+## Phase8 内部房间占用
+
+`POST /internal/v1/room-blocks`接收`roomId,startAt,endAt,sourceModule,sourceType,sourceRefId`。
+只使用独立`M1_CLASSROOM_TOKEN`或`M1_MAINTENANCE_TOKEN`作为Bearer。M2只能操作M2/CLASSROOM_BOOKING，M3只能操作M3/MAINTENANCE；用户JWT和D服务凭据返回401，来源越权403。
+
+首次创建返回201，data包含id、roomId、startAt、endAt、三个来源字段和status=ACTIVE；同来源同载荷返回200/当前记录，不同载荷409/OCCUPANCY_SOURCE_CONFLICT；时间冲突409/OCCUPANCY_TIME_CONFLICT。M2必须给出晚于开始的结束时间，M3结束为null；时间带时区且最多微秒精度。来源ID为1–64位字母、数字、冒号、下划线或连字符。新M2占用只接受启用的CLASSROOM，新M3接受启用的两类房间；非法参数400、缺少资源404、不可用资源422、D故障503。
+
+`DELETE /internal/v1/room-blocks/{sourceModule}/{sourceRefId}`只释放调用方固定来源类型，200返回同一id/房间/区间/来源及RELEASED。重复释放200，来源不存在404/OCCUPANCY_SOURCE_NOT_FOUND。已释放来源重复POST仍是200/RELEASED，不重新激活；新业务使用新来源ID。恢复既有记录和释放不依赖D继续可用。
+
+所有修改在room_gate锁内，与座位、整房、维修全部ACTIVE区间检查互斥，采用半开区间；维修null结束表示无限。释放不改变其他来源、不删除历史、不改D座位状态。内部接口保持网关屏蔽。完整响应schema和错误定义见OpenAPI，契约待成员三/四非作者审核。
 
 本页对应 [OpenAPI 3.0.3](../../contracts/openapi/reservation.v1.json) 中的 10 个操作，依据实际 `ReservationController`、`LifecycleController`、业务服务、`TimeRules` 和 `PlatformClient`。schema、公共契约和跨模块选择等待人工 review；文档与静态校验不能替代业务测试、Compose 重建或 GitHub SHA 验收。实际运行结果以阶段验收记录为准，基础预约选择见 [Phase 4 方案](../plans/phase-4.md)；本轮增加真实签到、定时 NO_SHOW、违约和真实 D 站内提醒，不提供公网时间控制或调度执行接口。
 
@@ -6,7 +19,7 @@
 
 API 使用网关 origin 下的根路径 `/api/v1/...`，OpenAPI server 为相对地址 `/`。本地预期 origin 是 `http://127.0.0.1:18080`；Nginx 根路径转发与最终端到端验收须以实际运行记录确认。服务内部地址与健康接口见 [运行 API](runtime.md)。
 
-所有操作需要 `Authorization: Bearer <D 签发的用户 JWT>`。M1 每次通过真实 HTTP 将用户凭证转发到 D 已有 `GET /api/v1/me`：D 验证签名、有效期、authVersion 和启用状态，并返回当前权限。D 中的禁用、权限变化和凭证失效会作用于下一次 M1 请求。M1 不接收 D 的 JWT 签名密钥、不直接读取 D 数据表。
+以下公开操作需要 `Authorization: Bearer <D 签发的用户 JWT>`。M1 每次通过真实 HTTP 将用户凭证转发到 D 已有 `GET /api/v1/me`：D 验证签名、有效期、authVersion 和启用状态，并返回当前权限。D 中的禁用、权限变化和凭证失效会作用于下一次 M1 请求。M1 不接收 D 的 JWT 签名密钥、不直接读取 D 数据表。
 
 M1 使用另一个专属 opaque 服务凭据调用 D 内部房间、座位和参数接口，该凭据也用于 D 内部验码和通知接收，不能登录 M1 用户 API。D 故障、超时或响应不符合契约时返回 `503`，不返回假成功或空目录掩盖失败。D 公共及内部契约见 [D API](platform.md)。
 
@@ -71,12 +84,12 @@ M1 使用另一个专属 opaque 服务凭据调用 D 内部房间、座位和参
 |---|---|
 | `id`、`userId`、`roomId`、`seatId` | 正整数 ID；用户、房间、座位是逻辑引用，无跨 schema 外键 |
 | `startAt`、`endAt` | 转换后的 UTC Instant，响应使用 `Z` |
-| `status` | 数据约束保留 `CREATED`、`CANCELLED`、`CHECKED_IN`、`NO_SHOW`、`COMPLETED`；当前实际产生前四种；自动 COMPLETED 转换仍未实现 |
+| `status` | 数据约束保留 `CREATED`、`CANCELLED`、`CHECKED_IN`、`NO_SHOW`、`COMPLETED`；启用审核后的正常完成开关时CHECKED_IN可到COMPLETED，默认关闭 |
 | `createdAt` | 创建的 UTC Instant |
 | `cancelledAt` | CANCELLED 时刻；NO_SHOW 结束有效性但不伪装为 CANCELLED，该字段仍为 `null` |
 | `rebookOf` | 原历史预约 ID；普通新建为 `null` |
 
-本人列表支持 `view=current|history`，默认 `current`，按 `startAt DESC, id DESC` 排序。`current` 是状态为 `CREATED/CHECKED_IN` 且 `endAt > Clock` 当前时刻；`history` 是状态为 `CANCELLED/NO_SHOW/COMPLETED` 或 `endAt <= Clock` 当前时刻。时间过去不会自动将状态写成 `COMPLETED`。
+本人列表支持 `view=current|history`，默认 `current`，按 `startAt DESC, id DESC` 排序。`current` 是状态为 `CREATED/CHECKED_IN` 且 `endAt > Clock` 当前时刻；`history` 是状态为 `CANCELLED/NO_SHOW/COMPLETED` 或 `endAt <= Clock` 当前时刻。默认关闭正常完成；审核后开启时，扫描器仅在已签到且到达endAt时原子完成与释放。
 
 本人列表、详情、取消、再预约、签到和违约始终按认证用户隔离，`SYSTEM_ADMIN` 也没有跨用户覆盖。详情、取消、再预约、签到中，不存在和属于其他用户的预约统一为 `404 RESERVATION_NOT_FOUND`，不泄露他人预约是否存在。
 
@@ -139,7 +152,7 @@ M1 先读取本人预约并检查时间，再通过真实 D `POST /internal/v1/c
 
 ## 提醒调度、投递与恢复
 
-默认每30秒扫描到期业务，另一个独立任务每30秒处理投递；调度线程池为2，D 投递等待不占用 NO_SHOW 扫描任务。服务端 Clock 决定到期判断，不以精确时间相等判断。实际处理可能受扫描间隔、停机、房间锁等待与批次影响，不能声称在指定秒已经送达。每批最多100个候选，后续扫描继续处理。生产默认开启，确定性测试关闭自动调度并直接调用相同业务方法；没有公网调度或改时钟接口。
+默认每30秒扫描到期业务，另一个独立任务每30秒处理投递；调度线程池为3（生命周期、提醒、可选审计各一项），D 投递等待不占用 NO_SHOW 扫描任务。服务端 Clock 决定到期判断，不以精确时间相等判断。实际处理可能受扫描间隔、停机、房间锁等待与批次影响，不能声称在指定秒已经送达。每批最多100个候选，后续扫描继续处理。生产默认开启，确定性测试关闭自动调度并直接调用相同业务方法；没有公网调度或改时钟接口。
 
 | kind | 可排队/尝试发送的窗口 | 迟到处理 |
 |---|---|---|
@@ -158,4 +171,4 @@ D `GET /api/v1/notifications` 是真实本人站内收件箱，详见[平台契�
 
 跨服务请求已经发出后，签到/取消无法与 D 接收进行分布式原子撤回；活跃 SENDING 领取可能仍取得 ACCEPTED。系统在领取前重新检查资格、抑制可撤回队列、使用稳定来源去重，并明确保留在途事实。当前不引入分布式事务或 D→M1 循环调用来假装消除这段边界。
 
-Phase 5 保留 CREATED、CANCELLED、CHECKED_IN、NO_SHOW 的真实转换与历史；自动 COMPLETED、完整业务 Web、审批、工单及 M2/M3 room-blocks 写接口仍留后续。第一版签到不采集 GPS、人脸、蓝牙或 NFC 数据。静态契约和调度实现不代表本轮 Docker/CI 或人工 review 已通过，结果应见实际阶段验收记录。
+Phase 5 保留 CREATED、CANCELLED、CHECKED_IN、NO_SHOW 的真实转换与历史；成员一已补room-blocks和默认关闭的COMPLETED触发；完整业务Web及组内政策/接口验收仍待后续。第一版签到不采集 GPS、人脸、蓝牙或 NFC 数据。静态契约和调度实现不代表本轮 Docker/CI 或人工 review 已通过，结果应见实际阶段验收记录。

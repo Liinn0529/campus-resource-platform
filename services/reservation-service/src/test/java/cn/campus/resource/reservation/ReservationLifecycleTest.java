@@ -411,6 +411,45 @@ class ReservationLifecycleTest extends ReservationApiTestSupport {
         platformJdbc.update("DELETE FROM platform.notification");
     }
 
+    @Test
+    void completesOnlyCheckedInReservationsAtEndAndKeepsOtherOccupancies() throws Exception {
+        String student = login(STUDENT);
+        long room = roomId(0);
+        long checked = create(room, seatId(room, 0), student);
+        long missed = create(room, seatId(room, 1), student);
+        String code = todayCode(room);
+        testClock.set(START);
+        status(checkin(checked, code, student), HttpStatus.OK);
+        testClock.set(START.plusSeconds(3600).minusNanos(1));
+        lifecycle.scanDue();
+        assertThat(state(checked)).isEqualTo("CHECKED_IN");
+        assertThat(state(missed)).isEqualTo("NO_SHOW");
+        testClock.set(START.plusSeconds(3600));
+        concurrently(3, () -> { lifecycle.scanDue(); return 1; });
+        assertThat(state(checked)).isEqualTo("COMPLETED");
+        assertThat(occupancy(checked)).isEqualTo("RELEASED");
+        assertThat(eventCount(checked, "COMPLETED")).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT actor_user_id FROM reservation.reservation_event WHERE reservation_id=? AND action='COMPLETED'", Long.class, checked)).isNull();
+        status(checkin(checked, code, student), HttpStatus.CONFLICT);
+        assertThat(count("audit_delivery")).isEqualTo(count("reservation_event"));
+    }
+
+    @Test
+    void damagedLedgerRollsBackCompletionAndItsAuditEvent() {
+        String student = login(STUDENT);
+        long room = roomId(0);
+        long id = create(room, seatId(room, 0), student);
+        String code = todayCode(room);
+        testClock.set(START);
+        status(checkin(id, code, student), HttpStatus.OK);
+        jdbc.update("UPDATE reservation.seat_occupancy SET end_at=end_at+INTERVAL '1 hour' WHERE source_ref_id=?", Long.toString(id));
+        testClock.set(START.plusSeconds(3600));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> lifecycle.scanDue());
+        assertThat(state(id)).isEqualTo("CHECKED_IN");
+        assertThat(eventCount(id, "COMPLETED")).isZero();
+        assertThat(count("audit_delivery")).isEqualTo(2);
+    }
+
     private long roomId(int offset) {
         return platformJdbc.queryForObject("SELECT id FROM platform.room WHERE enabled ORDER BY id LIMIT 1 OFFSET ?",
                 Long.class, offset);

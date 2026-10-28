@@ -4,7 +4,7 @@ spring:
   task:
     scheduling:
       pool:
-        size: 2
+        size: 3
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
@@ -28,6 +28,12 @@ mybatis:
   configuration:
     map-underscore-to-camel-case: true
 campus:
+  reservation:
+    completion-enabled: ${M1_COMPLETION_ENABLED:false}
+    audit-dispatch-enabled: ${M1_AUDIT_DISPATCH_ENABLED:false}
+  internal:
+    classroom-token: ${M1_CLASSROOM_TOKEN}
+    maintenance-token: ${M1_MAINTENANCE_TOKEN}
   platform:
     base-url: ${PLATFORM_BASE_URL}
     service-token: ${PLATFORM_RESERVATION_TOKEN}

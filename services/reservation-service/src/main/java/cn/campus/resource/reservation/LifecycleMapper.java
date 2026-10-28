@@ -31,6 +31,15 @@ interface LifecycleMapper {
             """)
     List<Candidate> due(Instant now);
 
+    @Select("SELECT id, room_id FROM reservation.seat_reservation WHERE status='CHECKED_IN' AND end_at <= #{now} ORDER BY end_at, id LIMIT 100")
+    List<Candidate> completedDue(Instant now);
+
+    @Update("UPDATE reservation.seat_reservation SET status='COMPLETED' WHERE id=#{id} AND status='CHECKED_IN'")
+    int complete(long id);
+
+    @Insert("INSERT INTO reservation.reservation_event(reservation_id, actor_user_id, action, request_id, occurred_at) VALUES (#{id}, NULL, 'COMPLETED', #{requestId}, #{now})")
+    int completedEvent(@Param("id") long id, @Param("requestId") UUID requestId, @Param("now") Instant now);
+
     @Select("""
             SELECT id, user_id, room_id, seat_id, start_at, end_at, status, created_at, cancelled_at, rebook_of
             FROM reservation.seat_reservation WHERE id = #{id} FOR UPDATE

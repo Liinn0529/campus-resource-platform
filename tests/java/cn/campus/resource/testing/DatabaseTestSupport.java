@@ -65,6 +65,8 @@ public final class DatabaseTestSupport {
             properties.add("campus.internal.classroom-token", () -> "test-only-classroom-internal-token-at-least-32-bytes");
             properties.add("campus.internal.maintenance-token", () -> "test-only-maintenance-internal-token-at-least-32-bytes");
         } else if (schema.equals("reservation")) {
+            properties.add("campus.internal.classroom-token", () -> "test-only-m1-classroom-client-token-at-least-thirty-two-bytes");
+            properties.add("campus.internal.maintenance-token", () -> "test-only-m1-maintenance-client-token-at-least-thirty-two-bytes");
             properties.add("campus.reservation.scheduler-enabled", () -> "false");
             properties.add("campus.platform.base-url", () -> "http://127.0.0.1:9");
             properties.add("campus.platform.service-token", () -> "test-only-reservation-internal-token-at-least-32-bytes");
@@ -83,7 +85,7 @@ public final class DatabaseTestSupport {
             PostgreSQLContainer<?> database, String ownSchema) throws SQLException {
         flyway.validate();
         assertThat(flyway.info().current()).isNotNull();
-        int version = ownSchema.equals("platform") ? 4 : ownSchema.equals("reservation") ? 3 : 2;
+        int version = ownSchema.equals("platform") || ownSchema.equals("reservation") ? 4 : 2;
         assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo(Integer.toString(version));
         assertThat(flyway.info().applied()).hasSize(version);
 

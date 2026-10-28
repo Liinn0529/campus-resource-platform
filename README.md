@@ -1,5 +1,7 @@
 # 校园资源服务平台
 
+**本分支：成员一 Phase8 占用/释放、正常完成草案和审计可靠投递。** 基于下列Phase7历史基线。请先读[实施与依赖](docs/plans/member-01-phase8.md)、[实际验证记录](docs/review/member-01-validation.md)及[Windows/WSL操作](docs/runbooks/member-01-windows.md)。M2取消/到期释放、D审计接收和非作者验收仍待组员交付；正常完成和审计发送默认关闭。下文Phase7状态保留为交接历史，不代表本分支仍缺M1接口。
+
 校园自习座位预约（M1）、整教室预约审批（M2）、物业报修（M3）和公共层（D）的 Monorepo。
 
 **当前执行：Phase7物业报修工单，153项后端、前端6项及四份OpenAPI校验通过，首轮实际运行验收通过。** 已实现报修/派单/开始/完工/验收及拒绝验收/前置取消/评价/超时升级，D新增仅M3可查的维修人员资格。见[Phase7方案](docs/plans/phase-7.md)、[工单API](docs/api/maintenance.md)、[验收记录](docs/review/phase-7-validation.md)。实际M1封房/释放属于Phase8，当前403如实保存SYNC_FAILED；完整角色Web在Phase9。Phase7结束等待确认，不提前进入Phase8。

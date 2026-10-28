@@ -1,4 +1,6 @@
-# 需求追踪矩阵（当前 Phase 7）
+# 需求追踪矩阵（成员一 Phase8 分项）
+
+本分支在Phase7历史基线上实现成员一分项。实现边界、待审政策和依赖见[成员一计划](../plans/member-01-phase8.md)，实际验证见[成员一记录](../review/member-01-validation.md)。以下Phase7总结保留为历史。成员一新增接口和完成/审计实现不等于M2取消到期释放、D审计接收、完整Web、CI或非作者审核已完成。
 
 来源与需求正文见 [REQUIREMENTS.md](REQUIREMENTS.md)，原文见 [CODEX_EXECUTION_PROMPT.md](CODEX_EXECUTION_PROMPT.md)。每个需求 ID 对应一行；保留原文要求的 `ID | Requirement | Module | API/Page | Test | Status` 六列，并增加 Source、Phase。
 
@@ -64,7 +66,7 @@ OQ-01..15全部保留。Phase 5对签到窗口、NO_SHOW、站内入箱/恢复�
 | REQ-DATA-001 | 建立 room_gate、seat_reservation、seat_occupancy、checkin、violation、reservation_event；不能只靠 seat.status 表示全部业务状态。 | M1 | M1 V2/V3七表 | D4/M1 V3实际迁移和102项测试通过；M1七表、唯一签到/违约、来源账本和事件已验证 | DONE | §七 | 2/4/5 |
 | REQ-DATA-002 | seat_occupancy 完整保留附录 B 的 11 个字段、可空性及来源枚举，能够追溯不可用来源。 | M1 | reservation V2 seat_occupancy | 真实 PostgreSQL 验证完整11字段、nullable seat/end、三来源、ACTIVE/RELEASED与释放信息；事件/账本一致性测试通过 | DONE | §七 | 2/4 |
 | REQ-DATA-003 | 建立 room_gate(room_id PRIMARY KEY)，房间级互斥所需行必须可获取。 | M1 | reservation V2 room_gate; ReservationMapper | room_id 主键；事务INSERT ON CONFLICT后FOR UPDATE，首次同房间同座位并发仅一成功，真实锁竞争测试通过 | DONE | §八 | 2/4 |
-| REQ-DATA-004 | 占用来源具有 (source_module, source_ref_id, source_type) 唯一约束。 | M1 | seat_occupancy occupancy_source_unique | V2 保留来源三元组唯一且取消不删记录、再预约新来源；M2/M3 幂等同/异载荷HTTP语义仍留Phase8 | PARTIAL | §九 | 2/8 |
+| REQ-DATA-004 | 占用来源具有 (source_module, source_ref_id, source_type) 唯一约束。 | M1 | RoomBlockController/Mapper；LifecycleService；成员一计划 | 成员一新增真实HTTP/PG、并发与生命周期测试；实际结果见member-01-validation；跨组依赖与审核未关闭 | PARTIAL | §九 | 2/8 |
 | REQ-DATA-005 | 建立 room_checkin_code，保留 room_id、date、code、created_at；每日每 room 一个码并由数据库唯一约束保证。 | D | platform V2 room_checkin_code; CommonService | 已执行：真实 PostgreSQL V2、room/date 主键、Clock 上海日界、8 位码、并发 ensure 单记录/单审计和内部验码测试通过 | DONE | §十二 | 2/3 |
 | REQ-DATA-006 | 建立 classroom_request、approval_step、approval_action、classroom_event。 | M2 | M2 V2四表 | V2真实迁移、约束及申请/步骤/动作/事件测试通过 | DONE | §十三 | 2/6 |
 | REQ-DATA-007 | 建立 user、role、permission、user_role、role_permission，保留附录 C 的七类角色和权限示例。 | D | platform V1–V3; ManagementService; AccessPolicy | 已执行：五表/七角色/原九权限示例及 14 项目录、初始 35 关系；角色/范围管理和后端授权测试通过，方案仍待人工 review | DONE | §十五 | 2/3 |
@@ -99,15 +101,15 @@ OQ-01..15全部保留。Phase 5对签到窗口、NO_SHOW、站内入箱/恢复�
 | REQ-M1-006 | 提供预约取消并释放对应占用；允许取消的状态及时间边界须先明确，不能臆造。 | M1 | POST /api/v1/reservations/{id}/cancel | 本人CREATED开始前取消/释放、重复幂等、开始时拒绝与单事件真实测试通过；具体方案待review；首次Compose真实网关/数据库验收通过，最终干净版本重建另记 | DONE | §五.2、十一; Phase 4 | 4 |
 | REQ-M1-007 | 提供当前预约、预约详情和历史预约查询；个人范围由后端权限限制。 | M1 | GET /api/v1/reservations?view=current 或 history; /{id} | 真实HTTP当前/取消或结束历史、本人详情及其他学生/管理员404测试通过；首次Compose真实网关/数据库验收通过，最终干净版本重建另记 | DONE | §五.2、十一; Phase 4 | 4 |
 | REQ-M1-008 | 可再次预约历史座位，创建新预约时仍执行时段、权限、参数和冲突检查。 | M1 | POST /api/v1/reservations/{id}/rebook | 真实HTTP历史新ID/rebookOf、新来源及当前元数据/参数/时段/冲突检查通过；首次Compose真实网关/数据库验收通过，最终干净版本重建另记 | DONE | §五.2、十一; Phase 4 | 4 |
-| REQ-M1-009 | 预约状态限定为 CREATED、CANCELLED、CHECKED_IN、NO_SHOW、COMPLETED；完整转换守卫及完成触发规则待确认。 | M1 | M1状态守卫; checkin/NO_SHOW | 本轮实现CHECKED_IN/NO_SHOW及合法守卫，正常COMPLETED触发未定，保持PARTIAL | PARTIAL | §十一 | 4/5 |
+| REQ-M1-009 | 预约状态限定为 CREATED、CANCELLED、CHECKED_IN、NO_SHOW、COMPLETED；完整转换守卫及完成触发规则待确认。 | M1 | RoomBlockController/Mapper；LifecycleService；成员一计划 | 成员一新增真实HTTP/PG、并发与生命周期测试；实际结果见member-01-validation；跨组依赖与审核未关闭 | PARTIAL | §十一 | 4/5 |
 | REQ-M1-010 | 以预约开始时间 T 为基准：T−15min 第一次提醒、T+10min 第二次提醒、T+15min 未签到判 NO_SHOW。 | M1/D | LifecycleService/Scheduler; reminder; D notification | T−15/T+10提醒与T+15 NO_SHOW真实HTTP/PostgreSQL+注入Clock验证，独立30秒任务和持久去重恢复通过 | DONE | §十一; Phase 5 | 5 |
 | REQ-M1-011 | NO_SHOW 处置需结束预约有效性、释放 occupancy、新增 violation、新增 audit/event；最终持久状态与“取消预约”表述歧义见 OQ-01。 | M1 | LifecycleService; violation; 系统事件 | NO_SHOW/精确来源释放/唯一违约/actor=null系统事件同事务，重复/并发与异常回滚验证通过 | DONE | §十一; Phase 5 | 5 |
 | REQ-M1-012 | 所有相关时间逻辑使用可注入 Clock，测试不得依赖真实等待或系统当前时间。 | M1 | TimeRules/ReservationService/LifecycleService; Clock | 基础预约及签到/提醒/截止/锁等待均使用注入Clock，真实HTTP测试无需等待15分钟 | DONE | §十一; Phase 5 | 5 |
 | REQ-M1-013 | Web 输入签到码后校验 room、reservation 再完成签到；签到结果由后端确定。 | M1/D | POST/api/v1/reservations/{id}/checkin; D verify | 本人窗口/房间码/预约验证及幂等后端已实现，真实D/HTTP与并发/窗口验证通过；完整Web输入及E2E留Phase9/10 | PARTIAL | §十二; Phase 5 | 5 |
 | REQ-M1-014 | 第一版签到不使用 GPS、人脸识别、蓝牙、NFC。 | M1/Web | CheckinInput; D verify; 依赖/采集范围 | 仅房间码和本人预约输入；实现/依赖与真实HTTP验证无GPS、人脸、蓝牙或NFC采集 | DONE | §十二 | 5 |
-| REQ-M1-015 | M1 作为座位占用账本唯一所有者，提供 M2 教室占用、M3 维修占用及释放能力，并保留来源。 | M1 | seat_occupancy; ReservationMapper conflict query | M1拥有账本，三来源/null seat冲突读模型真实PG测试通过；M2/M3创建/释放HTTP留Phase8 | PARTIAL | §七、八、九; Phase 8 | 4 基础; 8 集成 |
-| REQ-M1-016 | M2 创建/释放教室占用、M3 创建/释放维修占用均由 M1 在 room_gate 同房间锁事务内执行。 | M1/M2/M3 | room-blocks API | 计划，未执行：与 M1 预约并发的互斥验证 | TODO | §八 | 8 |
-| REQ-M1-017 | 维修占用支持 endAt=null 的开放结束时间；释放时更新账本释放信息，区间冲突边界待确认。 | M1/M3 | seat_occupancy nullable end; conflict query | 真实PG中M3开放结束形状持续阻止冲突区间，半开边界已测；真实维修创建/释放HTTP留Phase8 | PARTIAL | §九 | 8 |
+| REQ-M1-015 | M1 作为座位占用账本唯一所有者，提供 M2 教室占用、M3 维修占用及释放能力，并保留来源。 | M1 | RoomBlockController/Mapper；LifecycleService；成员一计划 | 成员一新增真实HTTP/PG、并发与生命周期测试；实际结果见member-01-validation；跨组依赖与审核未关闭 | PARTIAL | §七、八、九; Phase 8 | 4 基础; 8 集成 |
+| REQ-M1-016 | M2 创建/释放教室占用、M3 创建/释放维修占用均由 M1 在 room_gate 同房间锁事务内执行。 | M1/M2/M3 | RoomBlockController/Mapper；LifecycleService；成员一计划 | 成员一新增真实HTTP/PG、并发与生命周期测试；实际结果见member-01-validation；跨组依赖与审核未关闭 | PARTIAL | §八 | 8 |
+| REQ-M1-017 | 维修占用支持 endAt=null 的开放结束时间；释放时更新账本释放信息，区间冲突边界待确认。 | M1/M3 | RoomBlockController/Mapper；LifecycleService；成员一计划 | 成员一新增真实HTTP/PG、并发与生命周期测试；实际结果见member-01-validation；跨组依赖与审核未关闭 | PARTIAL | §九 | 8 |
 
 ## M2 整教室申请与审批
 
@@ -148,9 +150,9 @@ OQ-01..15全部保留。Phase 5对签到窗口、NO_SHOW、站内入箱/恢复�
 | REQ-API-001 | 公开 API 使用 /api/v1，内部 API 使用 /internal/v1，OpenAPI 3 文档随真实契约维护。 | D/M1/M2/M3 | D /api/v1与/internal/v1; M1/M2/M3 /api/v1; 四份OpenAPI | D37/M1 10/M2 6/M3 10操作与Controller同步且正式OpenAPI通过；M1占用写契约留Phase8 | PARTIAL | §十七 | 1 契约; 3–8 实现 |
 | REQ-API-002 | 成功响应统一含 data、requestId；失败响应统一含 code、message、requestId，保留业务错误码。 | D/M1/M2/M3 | D/M1/M2/M3 ApiEnvelope/ApiErrors; X-Request-ID | D/M1/M2/M3真实成功/失败响应与关联ID测试通过；网关自身错误及后续模块持续维护 | PARTIAL | §十七 | 3–8 |
 | REQ-API-003 | 按语义使用 200、201、204、400、401、403、404、409、422、500、503；禁止所有接口都返回 200。 | D/M1/M2/M3 | D/M1 Controller/异常/权限边界 | D/M1真实200/201/400/401/403/404/409/422/500/503语义测试通过；暂无204/硬删除，后续模块持续验证 | PARTIAL | §十七 | 3–8 |
-| REQ-API-004 | 提供 POST /internal/v1/room-blocks，请求字段 roomId、startAt、endAt、sourceModule、sourceType、sourceRefId 与附录 D 一致。 | M1/M2/M3 | POST /internal/v1/room-blocks | 计划，未执行：M2/M3 示例及非法组合契约测试 | TODO | §九 | 8 |
-| REQ-API-005 | 提供 DELETE /internal/v1/room-blocks/{sourceModule}/{sourceRefId} 释放来源占用；不得擅自更改路径解决三元唯一键歧义。 | M1/M2/M3 | DELETE /internal/v1/room-blocks/{sourceModule}/{sourceRefId} | 计划，未执行：释放目标、重复释放及歧义确认后的契约测试 | TODO | §九 | 8 |
-| REQ-API-006 | 同一来源重复请求内容一致返回已有结果，内容冲突返回 409 Conflict；不能产生重复占用。 | M1/M2/M3 | room-blocks API | 计划，未执行：同键同载荷、同键异载荷及并发重复测试 | TODO | §九 | 8 |
+| REQ-API-004 | 提供 POST /internal/v1/room-blocks，请求字段 roomId、startAt、endAt、sourceModule、sourceType、sourceRefId 与附录 D 一致。 | M1/M2/M3 | RoomBlockController/Mapper；LifecycleService；成员一计划 | 成员一新增真实HTTP/PG、并发与生命周期测试；实际结果见member-01-validation；跨组依赖与审核未关闭 | PARTIAL | §九 | 8 |
+| REQ-API-005 | 提供 DELETE /internal/v1/room-blocks/{sourceModule}/{sourceRefId} 释放来源占用；不得擅自更改路径解决三元唯一键歧义。 | M1/M2/M3 | RoomBlockController/Mapper；LifecycleService；成员一计划 | 成员一新增真实HTTP/PG、并发与生命周期测试；实际结果见member-01-validation；跨组依赖与审核未关闭 | PARTIAL | §九 | 8 |
+| REQ-API-006 | 同一来源重复请求内容一致返回已有结果，内容冲突返回 409 Conflict；不能产生重复占用。 | M1/M2/M3 | RoomBlockController/Mapper；LifecycleService；成员一计划 | 成员一新增真实HTTP/PG、并发与生命周期测试；实际结果见member-01-validation；跨组依赖与审核未关闭 | PARTIAL | §九 | 8 |
 | REQ-API-007 | 只重试网络错误和 5xx，不重试 4xx，最多 3 次，超出进入 SYNC_FAILED；“3 次”计数口径待确认。 | M2/M3/M1 | M2/M3 bounded sync | M2/M3均实现三总尝试、网络/5xx退避、4xx终止与持久恢复；实际M1封房/释放失败恢复联调待Phase8 | PARTIAL | §十 | 6–8 |
 | REQ-API-008 | API、HTTP client 和前端数据必须来自真实业务实现，公共契约更新后经人工审查并同步文档。 | D/M1/M2/M3 | 四服务API/OpenAPI; PlatformClient; 草稿PR | 四服务真实MyBatis/HTTP，153项及四份契约通过；草稿PR仍待人工review，实际M1集成/业务Web留Phase8/9 | PARTIAL | §一、十七、三十九 | 3–15 |
 
@@ -272,7 +274,7 @@ OQ-01..15全部保留。Phase 5对签到窗口、NO_SHOW、站内入箱/恢复�
 | REQ-PH-005 | 实现签到、T−15/T+10 提醒、T+15 NO_SHOW、违约和占用释放，使用可注入 Clock。 | M1/D | M1生命周期; D站内收件箱; V3/V4 | 完整clean reactor102项、前端6项、保留原卷D4/M1 V3升级及网关检查通过；最终干净SHA另核对，结束等待Phase6 | DONE | Phase 5 | 5 |
 | REQ-PH-006 | 实现 submit、approval、approve、reject、cancel、timeout；单元测试可 mock M1，生产必须真实 HTTP client。 | M2 | M2六操作/真实D/M1客户端 | 130测试及首轮保留卷/真实两级审批验收通过，分项已上传；最终SHA重建结果另见仓库外交付报告 | DONE | Phase 6 | 6 |
 | REQ-PH-007 | 实现 report、assign、start、finish、accept、cancel、review、escalate，并满足 §十四 rejectAcceptance 要求。 | M3 | M3十操作/升级任务 | 153后端与首轮原卷升级/真实工单验收通过；实际M1联动、完整UI留Phase8/9 | DONE | Phase 7 | 7 |
-| REQ-PH-008 | 连接 M2→M1、M3→M1，删除生产 mock；以真实审批占用及维修下架/验收恢复 E2E 验收。 | M2/M3/M1 | 跨模块集成 | 计划，未执行：两条真实跨模块流程 | TODO | Phase 8 | 8 |
+| REQ-PH-008 | 连接 M2→M1、M3→M1，删除生产 mock；以真实审批占用及维修下架/验收恢复 E2E 验收。 | M2/M3/M1 | RoomBlockController/Mapper；LifecycleService；成员一计划 | 成员一新增真实HTTP/PG、并发与生命周期测试；实际结果见member-01-validation；跨组依赖与审核未关闭 | PARTIAL | Phase 8 | 8 |
 | REQ-PH-009 | 完成 student、approval、maintenance、admin 前端流程，主要业务无需 Postman。 | Web | apps/web | 计划，未执行：全角色 Web 人工验收 | TODO | Phase 9 | 9 |
 | REQ-PH-010 | 建 Testcontainers、Playwright、cross-service integration、scripts/test-all.sh；实际执行脚本退出 0。 | 测试 | 测试体系 | 计划，未执行：全量测试实际通过 | TODO | Phase 10 | 10 |
 | REQ-PH-011 | 创建 .github/workflows/ci.yml；lint/test/build 失败均不能合并。 | CI | CI | 计划，未执行：失败门禁验收 | TODO | Phase 11 | 11 |

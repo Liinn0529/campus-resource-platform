@@ -126,6 +126,8 @@ abstract class ClassroomApiTestSupport {
                     Map.entry("FLYWAY_USERNAME", "reservation_migrator"),
                     Map.entry("FLYWAY_PASSWORD", DatabaseTestSupport.migratorPassword("reservation")),
                     Map.entry("PLATFORM_BASE_URL", PLATFORM_URL),
+                    Map.entry("M1_CLASSROOM_TOKEN", M1_CLASSROOM_TOKEN),
+                    Map.entry("M1_MAINTENANCE_TOKEN", "test-only-m1-maintenance-client-token-at-least-thirty-two-bytes"),
                     Map.entry("PLATFORM_RESERVATION_TOKEN", RESERVATION_TOKEN),
                     Map.entry("CAMPUS_BUSINESS_ZONE", "Asia/Shanghai")));
             RESERVATION_PROCESS = reservation.start();
@@ -176,6 +178,7 @@ abstract class ClassroomApiTestSupport {
     }
 
     protected void clearClassroomRows() {
+        reservationJdbc().update("DELETE FROM reservation.seat_occupancy");
         for (String table : List.of("approval_action", "classroom_event", "approval_step", "classroom_request")) {
             jdbc.update("DELETE FROM classroom." + table);
         }

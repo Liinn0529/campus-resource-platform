@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Campus Resource Platform — M1 预约、签到与违约 API",
-    "version": "0.1.0-phase5",
-    "description": "Phase 5 可运行草稿的静态公共契约，依据实际 ReservationController、LifecycleController、服务和真实 D HTTP 客户端。包含10个基础预约、本人签到和本人违约操作；提醒由后台调度与真实 D 站内收件箱接收，未提供公网调度入口。schema/公共契约待人工review，本文件不证明运行验收或CI通过。COMPLETED自动转换、完整业务Web和M2/M3占用写接口仍未实现。成功{data,requestId}，错误{code,message,requestId}。"
+    "version": "0.1.0-phase8-member1",
+    "description": "成员一可运行草稿：10个公开预约/签到/违约操作和2个内部房间占用操作。内部接口只接受M2/M3独立服务凭据，不经公网网关。COMPLETED规则已实现但默认关闭，待政策审核启用；审计可靠投递已实现，待D接收接口联调。schema/契约与政策仍待非作者人工审核，不代表整组Phase8已验收。"
   },
   "servers": [
     {
@@ -24,6 +24,10 @@
     {
       "name": "M1 签到与违约",
       "description": "本人签到与违约查询；后台NO_SHOW和提醒不开放公网执行接口。"
+    },
+    {
+      "name": "M1 内部占用",
+      "description": "仅内部网络，独立服务凭据。"
     }
   ],
   "paths": {
@@ -668,6 +672,223 @@
           }
         ]
       }
+    },
+    "/internal/v1/room-blocks": {
+      "post": {
+        "tags": [
+          "M1 内部占用"
+        ],
+        "operationId": "createRoomBlock",
+        "summary": "创建整房占用或返回原来源结果",
+        "description": "M2绑定CLASSROOM_BOOKING，M3绑定MAINTENANCE。共享room_gate锁，与全部ACTIVE来源按[startAt,endAt)互斥，null结束表示无限。相同来源同载荷返回原记录，包括RELEASED且不会重新激活；不调用D来恢复已有来源。不同载荷409。新建前通过D确认启用房间，不持数据库锁调用HTTP。",
+        "security": [
+          {
+            "OccupancyServiceBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoomBlockInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "首次创建ACTIVE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomBlockEnvelope"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "相同来源重放，当前ACTIVE或RELEASED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomBlockEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数/时间区间/精度非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或无效内部服务身份",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "身份与来源模块或来源类型不符",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在；DELETE为OCCUPANCY_SOURCE_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "来源内容冲突或房间时段冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "新占用目标未启用或M2目标不是CLASSROOM",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "数据库繁忙/公共层不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/v1/room-blocks/{sourceModule}/{sourceRefId}": {
+      "delete": {
+        "tags": [
+          "M1 内部占用"
+        ],
+        "operationId": "releaseRoomBlock",
+        "summary": "精确释放调用方来源",
+        "description": "两段路径对应唯一三元键：M2仅CLASSROOM_BOOKING，M3仅MAINTENANCE。不删除历史、不影响其他来源；重复释放返回相同ID和RELEASED。不存在404，不能当成已释放。不查询D，资源被停用或D故障时仍可释放。",
+        "security": [
+          {
+            "OccupancyServiceBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sourceModule",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "M2",
+                "M3"
+              ]
+            }
+          },
+          {
+            "name": "sourceRefId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9:_-]{1,64}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "释放或重复释放，状态RELEASED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomBlockEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数/时间区间/精度非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或无效内部服务身份",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "身份与来源模块或来源类型不符",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在；DELETE为OCCUPANCY_SOURCE_NOT_FOUND",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "数据库繁忙/公共层不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -677,6 +898,11 @@
         "scheme": "bearer",
         "bearerFormat": "JWT",
         "description": "D 签发的用户 JWT；M1 以真实 HTTP 转发至 D GET /api/v1/me，D 校验签名、有效期、authVersion 与启用状态，并返回当前权限。M1 不持有 D JWT 签名密钥，也不读取 D 表。另一个 M1 专属 opaque 服务凭据用于 D 内部目录/参数/验码/通知接收，不能作为此处用户凭证。"
+      },
+      "OccupancyServiceBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "M1_CLASSROOM_TOKEN或M1_MAINTENANCE_TOKEN；不是用户JWT或D凭据。"
       }
     },
     "parameters": {
@@ -1264,6 +1490,129 @@
             "type": "string",
             "format": "uuid",
             "description": "M1 为本次请求生成的追踪 ID，与 X-Request-ID 响应头相同。"
+          }
+        }
+      },
+      "RoomBlockInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "roomId",
+          "startAt",
+          "sourceModule",
+          "sourceType",
+          "sourceRefId"
+        ],
+        "properties": {
+          "roomId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "startAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "带时区，最多6位小数秒，比较Instant。"
+          },
+          "endAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "M2必填且晚于startAt；M3必须为null或省略。"
+          },
+          "sourceModule": {
+            "type": "string",
+            "enum": [
+              "M2",
+              "M3"
+            ]
+          },
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "CLASSROOM_BOOKING",
+              "MAINTENANCE"
+            ]
+          },
+          "sourceRefId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9:_-]{1,64}$"
+          }
+        }
+      },
+      "RoomBlock": {
+        "type": "object",
+        "required": [
+          "id",
+          "roomId",
+          "startAt",
+          "sourceModule",
+          "sourceType",
+          "sourceRefId",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "roomId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "startAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "带时区，最多6位小数秒，比较Instant。"
+          },
+          "endAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "M2必填且晚于startAt；M3必须为null或省略。"
+          },
+          "sourceModule": {
+            "type": "string",
+            "enum": [
+              "M2",
+              "M3"
+            ]
+          },
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "CLASSROOM_BOOKING",
+              "MAINTENANCE"
+            ]
+          },
+          "sourceRefId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9:_-]{1,64}$"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "RELEASED"
+            ]
+          }
+        }
+      },
+      "RoomBlockEnvelope": {
+        "type": "object",
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RoomBlock"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       }

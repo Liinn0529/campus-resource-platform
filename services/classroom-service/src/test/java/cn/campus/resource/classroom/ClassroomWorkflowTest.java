@@ -114,7 +114,7 @@ class ClassroomWorkflowTest extends ClassroomApiTestSupport {
     }
 
     @Test
-    void sequentialApprovalsPersistPendingBeforeRealM1RejectionAndNeverPretendTheRoomIsOccupied() {
+    void sequentialApprovalsPersistPendingBeforeRealM1ConfirmsTheRoomIsOccupied() {
         long id = submit(login(STUDENT), room(0), START);
         var first = action(id, "approve", login(ROOM_ADMIN));
         status(first, HttpStatus.OK);
@@ -126,14 +126,14 @@ class ClassroomWorkflowTest extends ClassroomApiTestSupport {
         assertThat(state(id)).isEqualTo("APPROVED_PENDING_SYNC");
         assertThat(count("approval_action")).isEqualTo(2);
         classroom.syncDue();
-        assertThat(state(id)).isEqualTo("SYNC_FAILED");
+        assertThat(state(id)).isEqualTo("APPROVED");
         assertThat(jdbc.queryForObject("SELECT sync_attempts FROM classroom.classroom_request WHERE id=?", Integer.class, id)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT sync_error FROM classroom.classroom_request WHERE id=?", String.class, id)).contains("403");
-        assertThat(reservationJdbc().queryForObject("SELECT count(*) FROM reservation.seat_occupancy", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT sync_error FROM classroom.classroom_request WHERE id=?", String.class, id)).isNull();
+        assertThat(reservationJdbc().queryForObject("SELECT count(*) FROM reservation.seat_occupancy WHERE status='ACTIVE'", Integer.class)).isEqualTo(1);
         classroom.runOnce();
         assertThat(jdbc.queryForObject("SELECT sync_attempts FROM classroom.classroom_request WHERE id=?", Integer.class, id)).isEqualTo(1);
         status(action(id, "cancel", login(STUDENT)), HttpStatus.CONFLICT);
-        assertThat(state(id)).isEqualTo("SYNC_FAILED");
+        assertThat(state(id)).isEqualTo("APPROVED");
     }
 
     @Test
@@ -149,6 +149,23 @@ class ClassroomWorkflowTest extends ClassroomApiTestSupport {
         status(action(id, "approve", both), HttpStatus.FORBIDDEN);
         assertThat(state(id)).isEqualTo("APPROVING");
         assertThat(count("approval_action")).isEqualTo(1);
+    }
+
+    @Test
+    void realM1ConflictIsTerminalAndPreservesThePreviouslyApprovedRequest() {
+        long first = submit(login(STUDENT), room(0), START);
+        long second = submit(login(OTHER), room(0), START);
+        for (long id : List.of(first, second)) {
+            status(action(id, "approve", login(ROOM_ADMIN)), HttpStatus.OK);
+            status(action(id, "approve", login(DEPARTMENT_USERNAME)), HttpStatus.OK);
+            classroom.syncDue();
+        }
+        assertThat(state(first)).isEqualTo("APPROVED");
+        assertThat(state(second)).isEqualTo("SYNC_FAILED");
+        assertThat(jdbc.queryForObject("SELECT sync_error FROM classroom.classroom_request WHERE id=?", String.class, second)).isEqualTo("M1_HTTP_409");
+        classroom.syncDue();
+        assertThat(jdbc.queryForObject("SELECT sync_attempts FROM classroom.classroom_request WHERE id=?", Integer.class, second)).isEqualTo(1);
+        assertThat(reservationJdbc().queryForObject("SELECT count(*) FROM reservation.seat_occupancy WHERE status='ACTIVE'", Integer.class)).isEqualTo(1);
     }
 
     @Test

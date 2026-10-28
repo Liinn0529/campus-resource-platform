@@ -72,10 +72,12 @@ class RuntimeEndpointsTest {
     @Test
     void deniesUnimplementedAndSensitivePaths() {
         for (String path : new String[] {"/actuator/env", "/actuator", "/api/v1/users",
-                "/internal/v1/room-blocks", "/login", "/actuator/health/liveness"}) {
+                "/login", "/actuator/health/liveness"}) {
             assertThat(http.getForEntity(path, String.class).getStatusCode())
                     .as(path).isEqualTo(HttpStatus.FORBIDDEN);
         }
+        assertThat(http.getForEntity("/internal/v1/room-blocks", String.class).getStatusCode())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test

@@ -64,17 +64,25 @@ class MaintenanceWorkflowTest extends MaintenanceApiTestSupport {
         assertThat(rows(request(HttpMethod.GET,PATH+"?view=assigned",null,staff))).hasSize(1);
         assertThat(request(HttpMethod.POST,PATH+"/"+id+"/assign",Map.of("assigneeId",staffId),manager).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     }
-    @Test void realM1RefusalPersistsFailureWithoutFakeMaintenanceOrOccupancy() {
+    @Test void realM1ConfirmsMaintenanceAndOnlyAcceptanceReleasesTheSameOccupancy() {
         long id=report(); assign(id);
         assertThat(request(HttpMethod.POST,PATH+"/"+id+"/start",null,student).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(request(HttpMethod.POST,PATH+"/"+id+"/start",null,staff).getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(state(id)).isEqualTo("BLOCKING_ROOM"); service.syncDue();
-        assertThat(state(id)).isEqualTo("SYNC_FAILED");
+        assertThat(state(id)).isEqualTo("IN_PROGRESS");
         var row=jdbc.queryForMap("SELECT sync_attempts,sync_error,occupancy_id FROM maintenance.repair_ticket WHERE id=?",id);
         assertThat(((Number)row.get("sync_attempts")).intValue()).isEqualTo(1);
-        assertThat(row.get("sync_error")).isEqualTo("M1_HTTP_403"); assertThat(row.get("occupancy_id")).isNull();
-        assertThat(reservationJdbc().queryForObject("SELECT count(*) FROM reservation.seat_occupancy",Long.class)).isZero();
+        assertThat(row.get("sync_error")).isNull(); assertThat(row.get("occupancy_id")).isNotNull();
+        assertThat(reservationJdbc().queryForObject("SELECT count(*) FROM reservation.seat_occupancy WHERE status='ACTIVE'",Long.class)).isEqualTo(1);
         service.syncDue(); assertThat(request(HttpMethod.POST,PATH+"/"+id+"/cancel",null,student).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(request(HttpMethod.POST,PATH+"/"+id+"/finish",Map.of("note","Completed work"),staff).getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(request(HttpMethod.POST,PATH+"/"+id+"/reject-acceptance",Map.of("note","Needs rework"),student).getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(reservationJdbc().queryForObject("SELECT status FROM reservation.seat_occupancy WHERE id=?",String.class,row.get("occupancy_id"))).isEqualTo("ACTIVE");
+        assertThat(request(HttpMethod.POST,PATH+"/"+id+"/finish",Map.of("note","Rework finished"),staff).getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(request(HttpMethod.POST,PATH+"/"+id+"/accept",Map.of("note","Accepted"),student).getStatusCode()).isEqualTo(HttpStatus.OK);
+        service.syncDue();
+        assertThat(state(id)).isEqualTo("COMPLETED");
+        assertThat(reservationJdbc().queryForObject("SELECT status FROM reservation.seat_occupancy WHERE id=?",String.class,row.get("occupancy_id"))).isEqualTo("RELEASED");
     }
     @Test void onlyReporterMayCancelBeforeBlockingAndEventsAreRetained() {
         long id=report(); assign(id);
@@ -83,6 +91,19 @@ class MaintenanceWorkflowTest extends MaintenanceApiTestSupport {
         assertThat(state(id)).isEqualTo("CANCELLED");
         assertThat(request(HttpMethod.POST,PATH+"/"+id+"/start",null,staff).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM maintenance.ticket_event WHERE ticket_id=?",Long.class,id)).isEqualTo(3);
+    }
+
+    @Test void anotherRealMaintenanceSourceCannotStealOrReleaseAnExistingBlock() {
+        long first=report(); assign(first);
+        assertThat(request(HttpMethod.POST,PATH+"/"+first+"/start",null,staff).getStatusCode()).isEqualTo(HttpStatus.OK);
+        service.syncDue(); assertThat(state(first)).isEqualTo("IN_PROGRESS");
+        long second=report(); assign(second);
+        assertThat(request(HttpMethod.POST,PATH+"/"+second+"/start",null,staff).getStatusCode()).isEqualTo(HttpStatus.OK);
+        service.syncDue(); assertThat(state(second)).isEqualTo("SYNC_FAILED");
+        assertThat(jdbc.queryForObject("SELECT sync_error FROM maintenance.repair_ticket WHERE id=?",String.class,second)).isEqualTo("M1_HTTP_409");
+        service.syncDue();
+        assertThat(jdbc.queryForObject("SELECT sync_attempts FROM maintenance.repair_ticket WHERE id=?",Integer.class,second)).isEqualTo(1);
+        assertThat(reservationJdbc().queryForObject("SELECT count(*) FROM reservation.seat_occupancy WHERE status='ACTIVE'",Integer.class)).isEqualTo(1);
     }
     @Test void finishAcceptRejectAndReviewCannotSkipWorkflow() {
         long id=report(); assign(id);

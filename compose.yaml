@@ -78,6 +78,10 @@ services:
       PLATFORM_BASE_URL: http://platform-service:8080
       PLATFORM_RESERVATION_TOKEN: ${PLATFORM_RESERVATION_TOKEN:?Run ./scripts/init-env.sh first}
       CAMPUS_BUSINESS_ZONE: ${CAMPUS_BUSINESS_ZONE:?Run ./scripts/init-env.sh first}
+      M1_CLASSROOM_TOKEN: ${M1_CLASSROOM_TOKEN:?Run ./scripts/init-env.sh first}
+      M1_MAINTENANCE_TOKEN: ${M1_MAINTENANCE_TOKEN:?Run ./scripts/init-env.sh first}
+      M1_COMPLETION_ENABLED: ${M1_COMPLETION_ENABLED:-false}
+      M1_AUDIT_DISPATCH_ENABLED: ${M1_AUDIT_DISPATCH_ENABLED:-false}
     build:
       <<: *backend-build
       args:

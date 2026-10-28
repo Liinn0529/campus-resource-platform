@@ -25,14 +25,17 @@ class LifecycleService {
     private final AccessPolicy access;
     private final Clock clock;
     private final TransactionTemplate transactions;
+    private final boolean completionEnabled;
 
     LifecycleService(LifecycleMapper lifecycle, ReservationMapper reservations, PlatformClient platform,
-            AccessPolicy access, Clock clock, PlatformTransactionManager transactionManager) {
+            AccessPolicy access, Clock clock, PlatformTransactionManager transactionManager,
+            @org.springframework.beans.factory.annotation.Value("${campus.reservation.completion-enabled:false}") boolean completionEnabled) {
         this.lifecycle = lifecycle;
         this.reservations = reservations;
         this.platform = platform;
         this.access = access;
         this.clock = clock;
+        this.completionEnabled = completionEnabled;
         this.transactions = new TransactionTemplate(transactionManager);
         this.transactions.setTimeout(10);
     }
@@ -81,6 +84,12 @@ class LifecycleService {
 
     void scanDue() {
         RuntimeException firstFailure = null;
+        if (completionEnabled) {
+            for (LifecycleMapper.Candidate candidate : lifecycle.completedDue(clock.instant())) {
+                try { complete(candidate); }
+                catch (RuntimeException failure) { if (firstFailure == null) { firstFailure = failure; } }
+            }
+        }
         for (LifecycleMapper.Candidate candidate : lifecycle.due(clock.instant())) {
             try {
                 process(candidate);
@@ -90,6 +99,23 @@ class LifecycleService {
             }
         }
         if (firstFailure != null) { throw firstFailure; }
+    }
+
+    private void complete(LifecycleMapper.Candidate candidate) {
+        transactions.executeWithoutResult(tx -> {
+            lockRoom(candidate.roomId());
+            var booking = lifecycle.lockBooking(candidate.id());
+            Instant now = clock.instant();
+            if (booking == null || !booking.status().equals("CHECKED_IN") || now.isBefore(booking.endAt())) { return; }
+            requireActiveLedger(booking);
+            if (lifecycle.checkinCount(booking.id(), booking.userId()) != 1
+                    || lifecycle.complete(booking.id()) != 1
+                    || reservations.release(booking.roomId(), booking.seatId(), Long.toString(booking.id()), now) != 1) {
+                throw inconsistent();
+            }
+            lifecycle.completedEvent(booking.id(), UUID.randomUUID(), now);
+            lifecycle.suppressPending(booking.id(), now, "RESERVATION_COMPLETED");
+        });
     }
 
     void dispatchDue() {

@@ -39,6 +39,9 @@ class PlatformClient {
     private record NotificationReceipt(long id, long userId, String sourceModule, String sourceRefId,
             long reservationId, long roomId, Instant startAt, String kind, Instant dueAt,
             Instant expiresAt, Instant createdAt) { }
+    private record AuditWrite(String sourceModule, String sourceEventId, String action, String entityType,
+            String entityId, Long actorUserId, Instant occurredAt, String sourceRequestId) { }
+    private record AuditReceipt(long id, String status) { }
 
     static final class NotificationFailure extends RuntimeException {
         private final boolean retryable;
@@ -181,6 +184,29 @@ class PlatformClient {
 
     private boolean validRequestId(String value) {
         return value != null && !value.isBlank() && value.length() <= 64;
+    }
+
+    long audit(AuditDeliveryMapper.Event event) {
+        try {
+            var response = http.post().uri("/internal/v1/audit-events")
+                    .headers(headers -> headers.setBearerAuth(serviceToken))
+                    .body(new AuditWrite("M1", "reservation-event:" + event.id(), event.action(), "RESERVATION",
+                            Long.toString(event.reservationId()), event.actorUserId(), event.occurredAt(), event.requestId().toString()))
+                    .retrieve().toEntity(new ParameterizedTypeReference<Envelope<AuditReceipt>>() { });
+            var body = response.getBody();
+            if ((response.getStatusCode().value() != 200 && response.getStatusCode().value() != 201)
+                    || body == null || body.data() == null || body.data().id() <= 0
+                    || !"ACCEPTED".equals(body.data().status()) || !validRequestId(body.requestId())) {
+                throw new NotificationFailure(false, "PLATFORM_INVALID_RESPONSE");
+            }
+            return body.data().id();
+        } catch (RestClientResponseException failure) {
+            throw new NotificationFailure(failure.getStatusCode().is5xxServerError(), "PLATFORM_HTTP_" + failure.getStatusCode().value());
+        } catch (ResourceAccessException failure) {
+            throw new NotificationFailure(true, "PLATFORM_NETWORK_ERROR");
+        } catch (RestClientException failure) {
+            throw new NotificationFailure(false, "PLATFORM_INVALID_RESPONSE");
+        }
     }
 
     private List<Seat> seats(long roomId, Long seatId, Boolean power, int limit, int offset) {

@@ -35,6 +35,9 @@ class RuntimeConfiguration {
 
     @Bean
     SecurityFilterChain security(HttpSecurity http, PlatformClient platform, ObjectMapper json,
+            @Value("${campus.internal.classroom-token}") String classroomToken,
+            @Value("${campus.internal.maintenance-token}") String maintenanceToken,
+            @Value("${campus.platform.service-token}") String platformToken,
             @Value("${campus.cors.origins}") List<String> origins) throws Exception {
         if (origins.isEmpty() || origins.stream().anyMatch(origin -> origin.contains("*"))) {
             throw new IllegalStateException("CORS requires explicit origins");
@@ -52,8 +55,12 @@ class RuntimeConfiguration {
         source.registerCorsConfiguration("/api/v1/reservations/**", cors);
         return http.csrf(AbstractHttpConfigurer::disable).cors(config -> config.configurationSource(source))
                 .addFilterBefore(new RemoteAuthenticationFilter(platform, json), AnonymousAuthenticationFilter.class)
+                .addFilterBefore(new InternalAuthenticationFilter(classroomToken, maintenanceToken, platformToken, json),
+                        AnonymousAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/info").permitAll()
+                        .requestMatchers("/internal/v1/room-blocks", "/internal/v1/room-blocks/**")
+                            .hasAuthority("OCCUPANCY_SERVICE")
                         .requestMatchers("/api/v1/reservation/**", "/api/v1/reservations", "/api/v1/reservations/**", "/api/v1/violations")
                             .authenticated()
                         .anyRequest().denyAll())

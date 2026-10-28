@@ -104,6 +104,7 @@ abstract class ReservationApiTestSupport {
         properties.add("campus.platform.service-token", () -> RESERVATION_TOKEN);
         properties.add("campus.business-zone", () -> "Asia/Shanghai");
         properties.add("campus.reservation.scheduler-enabled", () -> "false");
+        properties.add("campus.reservation.completion-enabled", () -> "true");
     }
 
     @Autowired protected TestRestTemplate http;
@@ -134,7 +135,7 @@ abstract class ReservationApiTestSupport {
     }
 
     protected void clearReservationRows() {
-        for (String table : List.of("reminder", "checkin", "violation", "reservation_event",
+        for (String table : List.of("audit_attempt", "audit_delivery", "reminder", "checkin", "violation", "reservation_event",
                 "seat_occupancy", "seat_reservation", "room_gate")) {
             jdbc.update("DELETE FROM reservation." + table);
         }
